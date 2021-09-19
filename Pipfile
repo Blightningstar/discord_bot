@@ -5,6 +5,8 @@ name = "pypi"
 
 [packages]
 youtube-dl = "*"
+discord = "*"
+PyNaCl = "*"
 
 [dev-packages]
 
