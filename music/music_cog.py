@@ -55,8 +55,10 @@ class MusicCog(commands.Cog):
         # Try to connect to a voice channel if you are not already connected
         if self.vc == "" or not self.vc.is_connected():
             self.vc = await self.music_queue[0][1].connect()
-        else:
-            self.vc = await self.bot.move_to(self.music_queue[0][1])
+        # elif self.vc != self.music_queue[0][1]:
+        #     # If the bot is connected but not in the same voice channel as you,
+        #     # move to that channel.
+        #     self.vc = await self.bot.move_to(self.music_queue[0][1])
 
     async def play_next(self):
         """
@@ -64,24 +66,28 @@ class MusicCog(commands.Cog):
         """
         if len(self.music_queue) > 0:
             self.is_playing = True
+            try:
+                # Get the first url
+                next_song_url = self.music_queue[0][0]['source']
 
-            # Get the first url
-            next_song_url = self.music_queue[0][0]['source']
+                # Try to connect to a voice channel if you are not already connected
+                await self.try_to_connect()
+                
+                print(self.music_queue)
 
-            # Try to connect to a voice channel if you are not already connected
-            await self.try_to_connect()
-            
-            print(self.music_queue)
+                # Remove the first element as you are currently playing it
+                self.music_queue.pop(0)
 
-            # Remove the first element as you are currently playing it
-            self.music_queue.pop(0)
+                # The Voice Channel we are currently on will start playing the next song
+                # Once that song is over "after=lambda e: self.play_next()" will play the 
+                # next song if it there is another one queued.
+                print(self.vc.is_playing())
+                self.vc.play(discord.FFmpegPCMAudio(next_song_url, **self.FFMPEG_OPTIONS))
 
-            # The Voice Channel we are currently on will start playing the next song
-            # Once that song is over "after=lambda e: self.play_next()" will play the 
-            # next song if it there is another one queued.
-            self.vc.play(discord.FFmpegPCMAudio(next_song_url, **self.FFMPEG_OPTIONS), after=lambda e: self.play_next())
+            except Exception:
+                self.is_playing = False
         else:
-            self.is_playing = False 
+            self.is_playing = False
 
     ################################################################### COMMANDS METHODS #########################################################
 
@@ -103,7 +109,7 @@ class MusicCog(commands.Cog):
         else:
             voice_channel = context.author.voice.channel
             song = self.search_youtube_url(youtube_query)
-            if type(song) == type(True): 
+            if not song: 
                 # This was done for the exception that search_youtube_url can throw if you try to
                 # reproduce a playlist or livestream. Search later if this can be avoided.
                 await context.send("Mae no se pudo descargar la cancion. Probablemente por ser una playlist o un livestream.")
@@ -111,11 +117,11 @@ class MusicCog(commands.Cog):
                 await context.send("Canción añadida a la colaヾ(•ω•`)o")
                 self.music_queue.append([song, voice_channel])
 
-                if self.is_playing == False: # Later change to if not self.is_playing:
+                if self.is_playing == False:
                     await self.play_next()
 
 
-    @commands.command()
+    @commands.command("cola")
     @commands.check(check_if_music_channel)
     async def queue(self, context):
         """
@@ -123,20 +129,23 @@ class MusicCog(commands.Cog):
         Params:
             * context: Represents the context in which a command is being invoked under.
         """
-        queue_display = ""
+        if len(self.music_queue) > 0:
+            queue_display = ""
 
-        for item in range(0, len(self.music_queue)):
-            queue_display += self.music_queue[item][0]["title"] + "\n"
-        
-        print(queue_display)
-
-        if queue_display != "":
-            await context.send(queue_display)
+            for item in range(0, len(self.music_queue)):
+                queue_display += str(item) + " - " + self.music_queue[item][0]["title"] + "\n"
+            
+            await context.send(embed=
+                discord.Embed(
+                    title= "Lista de Canciones en cola", 
+                    color=discord.Color.blurple())
+                    .add_field(name="Canciones",value=queue_display)
+            )
         else: 
-            await context.send("Actualmente no hay música en la cola")
+            await context.send("Actualmente no hay música en la cola 💔")
 
 
-    @commands.command()
+    @commands.command("saltela")
     @commands.check(check_if_music_channel)
     async def skip(self, context):
         if self.vc != "": 
@@ -147,8 +156,11 @@ class MusicCog(commands.Cog):
     # @commands.command()
     # @commands.check(check_if_music_channel)
     # async def disconnect(self, context):
-    #     if discord.VoiceClient.is_connected(self):
-    #         await discord.VoiceClient.disconnect(self)
+        #if not ctx.voice_state.voice:
+        #     return await ctx.send('Not connected to any voice channel.')
+
+        # await ctx.voice_state.stop()
+        # del self.voice_states[ctx.guild.id]
 
 
 
