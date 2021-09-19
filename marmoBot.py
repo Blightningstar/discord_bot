@@ -3,7 +3,7 @@ import os
 
 from music.music_cog import MusicCog
 
-bot = commands.Bot(command_prefix="/")
+bot = commands.Bot(command_prefix="")
 
 bot.add_cog(MusicCog(bot))
 

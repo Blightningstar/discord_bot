@@ -7,6 +7,7 @@ class MusicCog(commands.Cog):
         self.bot = bot
         self.is_playing = False
         self.music_queue = [] # [song, channel]
+        self.now_playing = [] # [song]
         self.FFMPEG_OPTIONS = {
             "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
             "options": "-vn"
@@ -45,8 +46,19 @@ class MusicCog(commands.Cog):
             except Exception:
                 return False
         return {"source": info["formats"][0]["url"], "title": info["title"]}
+    
+    async def try_to_connect(self):
+        """
+        Util method in charge of connecting for the first time the bot to start playing
+        the queue of music.
+        """
+        # Try to connect to a voice channel if you are not already connected
+        if self.vc == "" or not self.vc.is_connected():
+            self.vc = await self.music_queue[0][1].connect()
+        else:
+            self.vc = await self.bot.move_to(self.music_queue[0][1])
 
-    def play_next(self):
+    async def play_next(self):
         """
         Util method that takes care of recursively playing the queue until it's empty.
         """
@@ -56,32 +68,8 @@ class MusicCog(commands.Cog):
             # Get the first url
             next_song_url = self.music_queue[0][0]['source']
 
-            # Remove the first element as you are currently playing it
-            self.music_queue.pop(0)
-
-            # The Voice Channel we are currently on will start playing the next song
-            # Once that song is over "after=lambda e: self.play_next()" will play the 
-            # next song if it there is another one queued.
-            self.vc.play(discord.FFmpegPCMAudio(next_song_url, **self.FFMPEG_OPTIONS), after=lambda e: self.play_next())
-        else:
-            self.is_playing = False
-    
-    async def play_music(self):
-        """
-        Util method in charge of connecting for the first time the bot to start playing
-        the queue of music.
-        """
-        if len(self.music_queue) > 0:
-            self.is_playing = True
-        
-            # Get the first url
-            next_song_url = self.music_queue[0][0]['source']
-
             # Try to connect to a voice channel if you are not already connected
-            if self.vc == "" or not self.vc.is_connected():
-                self.vc = await self.music_queue[0][1].connect()
-            else:
-                self.vc = await self.bot.move_to(self.music_queue[0][1])
+            await self.try_to_connect()
             
             print(self.music_queue)
 
@@ -92,14 +80,12 @@ class MusicCog(commands.Cog):
             # Once that song is over "after=lambda e: self.play_next()" will play the 
             # next song if it there is another one queued.
             self.vc.play(discord.FFmpegPCMAudio(next_song_url, **self.FFMPEG_OPTIONS), after=lambda e: self.play_next())
-            # source = await discord.FFmpegOpusAudio.from_probe(next_song_url, **self.FFMPEG_OPTIONS)
-            # self.vc(source)
         else:
-            self.is_playing = False
+            self.is_playing = False 
 
     ################################################################### COMMANDS METHODS #########################################################
 
-    @commands.command()
+    @commands.command(name="rolela")
     @commands.check(check_if_music_channel)
     async def play(self, context, *args):
         """
@@ -126,7 +112,7 @@ class MusicCog(commands.Cog):
                 self.music_queue.append([song, voice_channel])
 
                 if self.is_playing == False: # Later change to if not self.is_playing:
-                    await self.play_music()
+                    await self.play_next()
 
 
     @commands.command()
@@ -156,9 +142,10 @@ class MusicCog(commands.Cog):
         if self.vc != "": 
             self.vs.stop()
             # Try to play the next song in the queue if it exists
-            await self.play_music()
+            await self.play_next()
     
     # @commands.command()
+    # @commands.check(check_if_music_channel)
     # async def disconnect(self, context):
     #     if discord.VoiceClient.is_connected(self):
     #         await discord.VoiceClient.disconnect(self)
