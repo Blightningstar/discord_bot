@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 from youtube_dl import YoutubeDL
+import os
 
 class MusicCog(commands.Cog):
     def __init__(self, bot):
@@ -151,9 +152,11 @@ class MusicCog(commands.Cog):
     @commands.check(check_if_music_channel)
     async def skip(self, context):
         if self.vc != "": 
-            self.vs.stop()
+            self.vc.stop()
             # Try to play the next song in the queue if it exists
             self.play_next()
+        else:
+            await context.send(f"Actualmente {os.getenv('BOT_NAME')} no está en un canal de voz.")
     
     # @commands.command()
     # @commands.check(check_if_music_channel)
