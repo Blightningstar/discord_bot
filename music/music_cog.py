@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 from youtube_dl import YoutubeDL
 import os
-from .music_commands import PLAY_COMMAND_NAME, QUEUE_COMMAND_NAME, SKIP_COMMAND_NAME
+from .music_commands import PLAY_COMMAND_ALIASES, QUEUE_COMMAND_ALIASES, SKIP_COMMAND_ALIASES
 from settings import BOT_NAME
 
 class MusicCog(commands.Cog):
@@ -56,7 +56,7 @@ class MusicCog(commands.Cog):
 
         command = (context.message.clean_content).split(" ")[0] # Get the command the user used.
         # If command is not the play one it is an error. Since play connects the bot.
-        if self.vc == "" and command != os.getenv('PLAY_COMMAND_NAME', PLAY_COMMAND_NAME):
+        if self.vc == "" and command not in PLAY_COMMAND_ALIASES and command != "play":
             await context.send(f"Mae el {os.getenv('BOT_NAME', BOT_NAME)} no esta en ningun canal de voz.")
             return False
         return True
@@ -127,7 +127,7 @@ class MusicCog(commands.Cog):
 
     ################################################################### COMMANDS METHODS #########################################################
 
-    @commands.command(name=os.getenv('PLAY_COMMAND_NAME', PLAY_COMMAND_NAME))
+    @commands.command(aliases=PLAY_COMMAND_ALIASES)
     @commands.check(check_if_valid)
     async def play(self, context, *args):
         """
@@ -156,7 +156,7 @@ class MusicCog(commands.Cog):
                     self.play_next()
 
 
-    @commands.command(name=os.getenv('QUEUE_COMMAND_NAME', QUEUE_COMMAND_NAME))
+    @commands.command(aliases=QUEUE_COMMAND_ALIASES)
     @commands.check(check_if_valid)
     async def queue(self, context):
         """
@@ -181,7 +181,7 @@ class MusicCog(commands.Cog):
                 await context.send("Actualmente no hay música en la cola 💔")
 
 
-    @commands.command(os.getenv('SKIP_COMMAND_NAME', SKIP_COMMAND_NAME))
+    @commands.command(aliases=SKIP_COMMAND_ALIASES)
     @commands.check(check_if_valid)
     async def skip(self, context):
         if await self.check_self_bot(context):
