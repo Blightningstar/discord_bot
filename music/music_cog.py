@@ -3,6 +3,7 @@ from discord.ext import commands
 from youtube_dl import YoutubeDL
 import os
 from .music_commands import PLAY_COMMAND_NAME, QUEUE_COMMAND_NAME, SKIP_COMMAND_NAME
+from settings import BOT_NAME
 
 class MusicCog(commands.Cog):
     def __init__(self, bot):
@@ -50,13 +51,13 @@ class MusicCog(commands.Cog):
             if self.is_playing:
                 # This means that the user is not in the same channel as the bot
                 if context.author.voice.channel.name != self.vc.channel.name:
-                    await context.send(f"Mae no estás en el mismo canal de voz que {os.getenv('BOT_NAME')}.")
+                    await context.send(f"Mae no estás en el mismo canal de voz que {os.getenv('BOT_NAME', BOT_NAME)}.")
                     return False
 
         command = (context.message.clean_content).split(" ")[0] # Get the command the user used.
         # If command is not the play one it is an error. Since play connects the bot.
         if self.vc == "" and command != os.getenv('PLAY_COMMAND_NAME', PLAY_COMMAND_NAME):
-            await context.send(f"Mae el {os.getenv('BOT_NAME')} no esta en ningun canal de voz.")
+            await context.send(f"Mae el {os.getenv('BOT_NAME', BOT_NAME)} no esta en ningun canal de voz.")
             return False
         return True
 
@@ -190,9 +191,9 @@ class MusicCog(commands.Cog):
                     # Try to play the next song in the queue if it exists
                     self.play_next()
                 else:
-                    await context.send(f"{os.getenv('BOT_NAME')} no esta tocando ninguna canción")  
+                    await context.send(f"{os.getenv('BOT_NAME', BOT_NAME)} no esta tocando ninguna canción")  
             else:
-                await context.send(f"Actualmente {os.getenv('BOT_NAME')} no está en un canal de voz.")
+                await context.send(f"Actualmente {os.getenv('BOT_NAME', BOT_NAME)} no está en un canal de voz.")
     
     # @commands.command()
     # @commands.check(check_if_music_channel)
