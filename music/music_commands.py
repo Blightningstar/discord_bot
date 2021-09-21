@@ -1,0 +1,3 @@
+PLAY_COMMAND_NAME = "rolela"
+QUEUE_COMMAND_NAME = "cola"
+SKIP_COMMAND_NAME = "saltela"
