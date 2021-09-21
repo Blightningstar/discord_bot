@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 from youtube_dl import YoutubeDL
 import os
+from .music_commands import PLAY_COMMAND_NAME, QUEUE_COMMAND_NAME, SKIP_COMMAND_NAME
 
 class MusicCog(commands.Cog):
     def __init__(self, bot):
@@ -35,10 +36,11 @@ class MusicCog(commands.Cog):
             return False
         return True
 
-    async def check_if_in_same_channel_as_bot(self, context):
+    async def check_self_bot(self, context):
         """
         Util method used to only enable the use of the musicCog commands if:
             - The author that send the command is in the same voice channel as the bot.
+            - The bot is playing audio in a voice channel.
         Params:
             * context: Represents the context in which a command is being invoked under.
         """
@@ -50,6 +52,12 @@ class MusicCog(commands.Cog):
                 if context.author.voice.channel.name != self.vc.channel.name:
                     await context.send(f"Mae no estás en el mismo canal de voz que {os.getenv('BOT_NAME')}.")
                     return False
+
+        command = (context.message.clean_content).split(" ")[0] # Get the command the user used.
+        # If command is not the play one it is an error. Since play connects the bot.
+        if self.vc == "" and command != os.getenv('PLAY_COMMAND_NAME', PLAY_COMMAND_NAME):
+            await context.send(f"Mae el {os.getenv('BOT_NAME')} no esta en ningun canal de voz.")
+            return False
         return True
 
     def search_youtube_url(self, item):
@@ -74,12 +82,17 @@ class MusicCog(commands.Cog):
         the queue of music.
         """
         # Try to connect to a voice channel if you are not already connected
-        if self.vc == "" or not self.vc.is_connected():
-            self.vc = await self.music_queue[0][1].connect()
-        elif self.vc != self.music_queue[0][1]:
-            # If the bot is connected but not in the same voice channel as you,
-            # move to that channel.
-            self.vc = await self.vc.move_to(self.music_queue[0][1])
+        if self.vc == "" or not self.vc:
+            try:
+                self.vc = await self.music_queue[0][1].connect()
+            except:
+                pass
+        elif self.vc.is_connected():
+            if self.vc.channel.name != self.music_queue[0][1].name:
+                # If the bot is connected but not in the same voice channel as you,
+                # move to that channel.
+                self.vc = await self.vc.disconnect()
+                self.vc = await self.music_queue[0][1].connect()
 
     def play_next(self):
         """
@@ -101,6 +114,7 @@ class MusicCog(commands.Cog):
                 # The Voice Channel we are currently on will start playing the next song
                 # Once that song is over "after=lambda e: self.play_next()" will play the 
                 # next song if it there is another one queued.
+                self.is_playing = True
                 self.vc.play(discord.FFmpegPCMAudio(next_song_url, **self.FFMPEG_OPTIONS ), after=lambda e: self.play_next())
                 self.vc.source = discord.PCMVolumeTransformer(self.vc.source)
                 self.vc.source.volume = 0.7
@@ -112,7 +126,7 @@ class MusicCog(commands.Cog):
 
     ################################################################### COMMANDS METHODS #########################################################
 
-    @commands.command(name="rolela")
+    @commands.command(name=os.getenv('PLAY_COMMAND_NAME', PLAY_COMMAND_NAME))
     @commands.check(check_if_valid)
     async def play(self, context, *args):
         """
@@ -122,7 +136,7 @@ class MusicCog(commands.Cog):
             * context: Represents the context in which a command is being invoked under.
             * args: The link of the youtube video
         """
-        if await self.check_if_in_same_channel_as_bot(context):
+        if await self.check_self_bot(context):
             youtube_query = " ".join(args)
 
             voice_channel = context.author.voice.channel
@@ -141,7 +155,7 @@ class MusicCog(commands.Cog):
                     self.play_next()
 
 
-    @commands.command("cola")
+    @commands.command(name=os.getenv('QUEUE_COMMAND_NAME', QUEUE_COMMAND_NAME))
     @commands.check(check_if_valid)
     async def queue(self, context):
         """
@@ -149,7 +163,7 @@ class MusicCog(commands.Cog):
         Params:
             * context: Represents the context in which a command is being invoked under.
         """
-        if await self.check_if_in_same_channel_as_bot(context):
+        if await self.check_self_bot(context):
             if len(self.music_queue) > 0:
                 queue_display = ""
 
@@ -166,14 +180,17 @@ class MusicCog(commands.Cog):
                 await context.send("Actualmente no hay música en la cola 💔")
 
 
-    @commands.command("saltela")
+    @commands.command(os.getenv('SKIP_COMMAND_NAME', SKIP_COMMAND_NAME))
     @commands.check(check_if_valid)
     async def skip(self, context):
-        if await self.check_if_in_same_channel_as_bot(context):
+        if await self.check_self_bot(context):
             if self.vc != "": 
-                self.vc.stop()
-                # Try to play the next song in the queue if it exists
-                self.play_next()
+                if self.vc.is_playing():
+                    self.vc.stop()
+                    # Try to play the next song in the queue if it exists
+                    self.play_next()
+                else:
+                    await context.send(f"{os.getenv('BOT_NAME')} no esta tocando ninguna canción")  
             else:
                 await context.send(f"Actualmente {os.getenv('BOT_NAME')} no está en un canal de voz.")
     
