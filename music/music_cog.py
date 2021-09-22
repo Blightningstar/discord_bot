@@ -1,9 +1,11 @@
+from math import e
 import discord
+import os
 from discord.ext import commands
 from youtube_dl import YoutubeDL
-import os
 from .music_commands import PLAY_COMMAND_ALIASES, QUEUE_COMMAND_ALIASES, SKIP_COMMAND_ALIASES
-from settings import BOT_NAME
+from settings import BOT_NAME, COOKIE_FILE
+# from .fetch_yt_playlist import Page, exact_link
 
 class MusicCog(commands.Cog):
     def __init__(self, bot):
@@ -15,7 +17,25 @@ class MusicCog(commands.Cog):
             "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
             "options": "-vn"
         }
-        self.YDL_OPTIONS = {"format": "bestaudio"}
+        self.YDL_OPTIONS = {
+            "format": "bestaudio",
+            "postprocessors": [{
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+                "preferredquality": "192",
+            }],
+            "cookiefile": COOKIE_FILE,
+        }
+
+        self.YDL_OPTIONS_PLAYLIST = {
+            "format": "bestaudio/best",
+            "postprocessors": [{
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+                "preferredquality": "192",
+            }],
+            "cookiefile": COOKIE_FILE,
+        }
         self.vc = "" # Stores current channel
 
     ################################################################### UTIL METHODS #############################################################
@@ -76,6 +96,29 @@ class MusicCog(commands.Cog):
             except Exception:
                 return False
         return {"source": info["formats"][0]["url"], "title": info["title"], "duration": info["duration"]}
+
+    def search_youtube_playlist(self, url, voice_channel):
+        """
+        Util method that takes care of fetching necessary info from a youtube url or item
+        to process on a later stage.
+        Params: 
+            * url: This is playlist url from youtube (Public or Unlisted)
+        Returns:
+            * The source and title of the youtube url.
+        """
+        with YoutubeDL(self.YDL_OPTIONS_PLAYLIST) as ydl:
+            try:
+                relevant_data = []
+                info = ydl.extract_info(url, download=False)["entries"]
+                for item in info:
+                    relevant_data.append([{
+                        "source": item["formats"][0]["url"],
+                        "title": item["title"],
+                        "duration": item["duration"]
+                    }, voice_channel])
+            except Exception:
+                return False
+        return relevant_data
     
     async def try_to_connect(self):
         """
@@ -139,21 +182,35 @@ class MusicCog(commands.Cog):
         """
         if await self.check_self_bot(context):
             youtube_query = " ".join(args)
+            is_playlist = False
 
             voice_channel = context.author.voice.channel
-            song_info = self.search_youtube_url(youtube_query)
-            if not song_info: 
-                # This was done for the exception that search_youtube_url can throw if you try to
-                # reproduce a playlist or livestream. Search later if this can be avoided.
-                await context.send("Mae no se pudo descargar la cancion. Probablemente por ser una playlist o un livestream.")
-            else:
-                self.music_queue.append([song_info, voice_channel])
-                await context.send("Canción añadida a la colaヾ(•ω•`)o")
+            if "list" in youtube_query:
+                # This means it is a list
+                is_playlist = True
 
-                if self.is_playing == False:
-                    # Try to connect to a voice channel if you are not already connected
-                    await self.try_to_connect()
-                    self.play_next()
+            if is_playlist:
+                playlist_info = self.search_youtube_playlist(youtube_query, voice_channel)
+                if not playlist_info: 
+                    await context.send("Mae no se pudo poner la playlist.")
+                else:
+                    self.music_queue.extend(playlist_info)
+                    await context.send(f"{len(playlist_info)} canciones añadidas a la colaヾ(•ω•`)o")
+            else:    
+                song_info = self.search_youtube_url(youtube_query)
+                if not song_info: 
+                    # This was done for the exception that search_youtube_url can throw if you try to
+                    # reproduce a playlist or livestream. Search later if this can be avoided.
+                    await context.send("Mae no se pudo descargar la cancion. Probablemente por ser un livestream.")
+                else:
+                    print(song_info)
+                    self.music_queue.append([song_info, voice_channel])
+                    await context.send("Canción añadida a la colaヾ(•ω•`)o")
+
+            if self.is_playing == False:
+                # Try to connect to a voice channel if you are not already connected
+                await self.try_to_connect()
+                self.play_next()
 
 
     @commands.command(aliases=QUEUE_COMMAND_ALIASES)
