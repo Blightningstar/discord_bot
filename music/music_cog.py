@@ -1,11 +1,13 @@
-from math import e
 import discord
 import os
+import numpy as np
 from discord.ext import commands
 from youtube_dl import YoutubeDL
-from .music_commands import PLAY_COMMAND_ALIASES, QUEUE_COMMAND_ALIASES, SKIP_COMMAND_ALIASES, SHUFFLE_COMMAND_ALIASES
 from settings import BOT_NAME, COOKIE_FILE
-import numpy as np
+from .music_commands import (
+    PLAY_COMMAND_ALIASES, QUEUE_COMMAND_ALIASES, 
+    SKIP_COMMAND_ALIASES, SHUFFLE_COMMAND_ALIASES, 
+    NOW_PLAYING_COMMAND_ALIASES)
 
 class MusicCog(commands.Cog):
     def __init__(self, bot):
@@ -15,6 +17,7 @@ class MusicCog(commands.Cog):
         self.music_queue = [] # [song, channel]
         self.shuffled_music_queue = [] # [song, channel] used to store temporarily the shuffled queue, this avoids problems when a song is playing
         self.now_playing = [] # [song]
+
         self.FFMPEG_OPTIONS = {
             "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
             "options": "-vn"
@@ -96,14 +99,14 @@ class MusicCog(commands.Cog):
         Params: 
             * item: This is the url from youtube
         Returns:
-            * The source, title and duration of the youtube url.
+            * The source, title, thumbnail and duration of the youtube url.
         """
         with YoutubeDL(self.YDL_OPTIONS) as ydl:
             try:
                 info = ydl.extract_info(f"ytsearch:{item}", download=False)['entries'][0]
             except Exception:
                 return False
-        return {"source": info["formats"][0]["url"], "title": info["title"], "duration": info["duration"]}
+        return {"source": info["formats"][0]["url"], "title": info["title"], "duration": info["duration"], "thumbnail": info["thumbnail"]}
 
     def search_youtube_playlist(self, url, voice_channel):
         """
@@ -113,8 +116,8 @@ class MusicCog(commands.Cog):
             * url: This is playlist url from youtube (Public or Unlisted)
             * voice_channel: The voice channel the bot will play the song
         Returns:
-            * relevant_data: The array with the source, title and duration of the song along
-                            with the voice channel the audio will play.
+            * relevant_data: The array with the source, title, thumbnail and duration 
+                        of the song along with the voice channel the audio will play.
         """
         with YoutubeDL(self.YDL_OPTIONS_PLAYLIST) as ydl:
             try:
@@ -124,7 +127,8 @@ class MusicCog(commands.Cog):
                     relevant_data.append([{
                         "source": item["formats"][0]["url"],
                         "title": item["title"],
-                        "duration": item["duration"]
+                        "duration": item["duration"],
+                        "thumbnail": item["thumbnail"]
                     }, voice_channel])
             except Exception:
                 return False
@@ -169,7 +173,7 @@ class MusicCog(commands.Cog):
                 # is needed later.
                 if len(self.now_playing) > 0:
                     self.now_playing.pop()
-                self.now_playing.append(self.music_queue.pop(0))
+                self.now_playing.append(self.music_queue.pop(0)[0])
 
                 # The Voice Channel we are currently on will start playing the next song
                 # Once that song is over "after=lambda e: self.play_next()" will play the 
@@ -183,6 +187,21 @@ class MusicCog(commands.Cog):
                 self.is_playing = False
         else:
             self.is_playing = False
+
+    def convert_seconds(self, seconds):
+        """
+        Util method that takes seconds and turns them into string 
+        in the format hour, minutes and seconds.
+        Params:
+            * seconds: the amount of seconds to convert.
+        """
+        seconds = seconds % (24 * 3600)
+        hour = seconds // 3600
+        seconds %= 3600
+        minutes = seconds // 60
+        seconds %= 60
+        
+        return "%d:%02d:%02d" % (hour, minutes, seconds)
 
     ################################################################### COMMANDS METHODS #########################################################
 
@@ -254,7 +273,7 @@ class MusicCog(commands.Cog):
                     discord.Embed(
                         title= "Lista de Canciones en cola", 
                         color=discord.Color.blurple())
-                        .add_field(name="Canciones",value=queue_display)
+                        .add_field(name="Canciones", value=queue_display)
                 )
             else: 
                 await context.send("Actualmente no hay música en la cola 💔")
@@ -264,7 +283,7 @@ class MusicCog(commands.Cog):
     @commands.check(check_if_valid)
     async def skip(self, context):
         """
-        Command that displays the songs currently on the music queue.
+        Command that skip the current song playing on the bot.
         Params:
             * context: Represents the context in which a command is being invoked under.
         """
@@ -283,7 +302,7 @@ class MusicCog(commands.Cog):
     @commands.check(check_if_valid)
     async def shuffle(self, context):
         """
-        Command that displays the songs currently on the music queue.
+        Command that shuffles the order of the current songs on the music queue.
         Params:
             * context: Represents the context in which a command is being invoked under.
         """
@@ -294,7 +313,28 @@ class MusicCog(commands.Cog):
                 self.shuffled_music_queue = numpy_array.tolist()
                 self.is_queue_shuffled = True
             else:
-               await context.send("La cola no tiene canciones actualmente :c") 
+               await context.send("La cola no tiene canciones actualmente :c")
+
+
+    @commands.command(aliases=NOW_PLAYING_COMMAND_ALIASES)
+    @commands.check(check_if_valid)
+    async def now_playing(self, context):
+        """
+        Command that shows the info of the current song playing.
+        Params:
+            * context: Represents the context in which a command is being invoked under.
+        """
+        if await self.check_self_bot(context):
+            if self.is_playing:
+                await context.send(
+                    embed= discord.Embed(
+                        color=discord.Color.blurple())
+                        .add_field(name="Canción Actual", value=self.now_playing[0]["title"])
+                        .add_field(name="Duración", value=self.convert_seconds(self.now_playing[0]["duration"]))
+                        .set_thumbnail(url=self.now_playing[0]["thumbnail"])
+                )
+            else:
+               await context.send("Actualmente no se está tocando ninguna canción.") 
     
     
     # @commands.command()
