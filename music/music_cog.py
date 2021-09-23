@@ -24,7 +24,7 @@ class MusicCog(commands.Cog):
                 "preferredcodec": "mp3",
                 "preferredquality": "192",
             }],
-            "cookiefile": COOKIE_FILE,
+            "cookiefile": COOKIE_FILE, # File to bypass age restrictions
             "simulate": True,
         }
 
@@ -35,7 +35,7 @@ class MusicCog(commands.Cog):
                 "preferredcodec": "mp3",
                 "preferredquality": "192",
             }],
-            "cookiefile": COOKIE_FILE, # File name where cookies should be read from and dumped to.
+            "cookiefile": COOKIE_FILE, # File to bypass age restrictions
             "ignoreerrors": True, # Do not stop on download errors.
         }
         self.vc = "" # Stores current channel
@@ -246,9 +246,8 @@ class MusicCog(commands.Cog):
         if await self.check_self_bot(context):
             if self.vc != "": 
                 if self.vc.is_playing():
+                    # This will trigger the lambda e function from play_next method to jump to the next song in queue
                     self.vc.stop()
-                    # Try to play the next song in the queue if it exists
-                    self.play_next()
                 else:
                     await context.send(f"{os.getenv('BOT_NAME', BOT_NAME)} no esta tocando ninguna canción")  
             else:
