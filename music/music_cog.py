@@ -25,6 +25,7 @@ class MusicCog(commands.Cog):
                 "preferredquality": "192",
             }],
             "cookiefile": COOKIE_FILE,
+            "simulate": True,
         }
 
         self.YDL_OPTIONS_PLAYLIST = {
@@ -34,7 +35,8 @@ class MusicCog(commands.Cog):
                 "preferredcodec": "mp3",
                 "preferredquality": "192",
             }],
-            "cookiefile": COOKIE_FILE,
+            "cookiefile": COOKIE_FILE, # File name where cookies should be read from and dumped to.
+            "ignoreerrors": True, # Do not stop on download errors.
         }
         self.vc = "" # Stores current channel
 
@@ -186,7 +188,7 @@ class MusicCog(commands.Cog):
 
             voice_channel = context.author.voice.channel
             if "list" in youtube_query:
-                # This means it is a list
+                # This means it is a playlist
                 is_playlist = True
 
             if is_playlist:
