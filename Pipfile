@@ -7,6 +7,7 @@ name = "pypi"
 youtube-dl = "*"
 discord = "*"
 PyNaCl = "*"
+numpy = "*"
 
 [dev-packages]
 

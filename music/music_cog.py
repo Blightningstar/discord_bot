@@ -1,35 +1,96 @@
 import discord
+import os
+import numpy as np
 from discord.ext import commands
 from youtube_dl import YoutubeDL
+from settings import BOT_NAME, COOKIE_FILE
+from .music_commands import (
+    PLAY_COMMAND_ALIASES, QUEUE_COMMAND_ALIASES, 
+    SKIP_COMMAND_ALIASES, SHUFFLE_COMMAND_ALIASES, 
+    NOW_PLAYING_COMMAND_ALIASES)
 
 class MusicCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.is_playing = False
+        self.is_playing = False # To know when the bot is playing music
+        self.is_queue_shuffled = False # To know when the queue has been shuffled.
         self.music_queue = [] # [song, channel]
+        self.shuffled_music_queue = [] # [song, channel] used to store temporarily the shuffled queue, this avoids problems when a song is playing
         self.now_playing = [] # [song]
+
         self.FFMPEG_OPTIONS = {
             "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
             "options": "-vn"
         }
-        self.YDL_OPTIONS = {"format": "bestaudio"}
+        self.YDL_OPTIONS = {
+            "format": "bestaudio",
+            "postprocessors": [{
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+                "preferredquality": "192",
+            }],
+            "cookiefile": COOKIE_FILE, # File to bypass age restrictions
+            "simulate": True,
+        }
+
+        self.YDL_OPTIONS_PLAYLIST = {
+            "format": "bestaudio/best",
+            "postprocessors": [{
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+                "preferredquality": "192",
+            }],
+            "cookiefile": COOKIE_FILE, # File to bypass age restrictions
+            "ignoreerrors": True, # Do not stop on download errors.
+        }
         self.vc = "" # Stores current channel
 
     ################################################################### UTIL METHODS #############################################################
 
-    async def check_if_music_channel(context):
+    async def check_if_valid(context):
         """
         Util method used as decorator with the @commands.check so it only enables the use of the 
-        musicCog commands if the command was issued in the music text channel.
+        musicCog commands if:
+            - The command was issued in the music text channel.
+            - The author that send the command is in a voice channel.
         Params:
             * context: Represents the context in which a command is being invoked under.
+        Returns:
+            * If the command is valid
         """
-        is_music_channel = False
-        if context.message.channel.name == "music":
-            is_music_channel = True
-        else:
+        if context.message.channel.name != "music":
             await context.send("Solo se puede usar la funcionalidad de musica en el canal de 'music'.")
-        return is_music_channel
+            return False
+        elif context.author.voice is None:
+            await context.send("Mae mamaste! No estás en un canal de voz")
+            return False
+        return True
+
+    async def check_self_bot(self, context):
+        """
+        Util method used to only enable the use of the musicCog commands if:
+            - The author that send the command is in the same voice channel as the bot.
+            - The bot is playing audio in a voice channel.
+        Params:
+            * context: Represents the context in which a command is being invoked under.
+        Returns:
+            * If the command is valid
+        """
+        # This means that the user is in a voice channel
+        if context.author.voice:
+            # This means the bot is currently playing a song
+            if self.is_playing:
+                # This means that the user is not in the same channel as the bot
+                if context.author.voice.channel.name != self.vc.channel.name:
+                    await context.send(f"Mae no estás en el mismo canal de voz que {os.getenv('BOT_NAME', BOT_NAME)}.")
+                    return False
+
+        command = (context.message.clean_content).split(" ")[0] # Get the command the user used.
+        # If command is not the play one it is an error. Since play connects the bot.
+        if self.vc == "" and command not in PLAY_COMMAND_ALIASES and command != "play":
+            await context.send(f"Mae el {os.getenv('BOT_NAME', BOT_NAME)} no esta en ningun canal de voz.")
+            return False
+        return True
 
     def search_youtube_url(self, item):
         """
@@ -38,14 +99,40 @@ class MusicCog(commands.Cog):
         Params: 
             * item: This is the url from youtube
         Returns:
-            * The source and title of the youtube url.
+            * The source, title, thumbnail and duration of the youtube url.
         """
         with YoutubeDL(self.YDL_OPTIONS) as ydl:
             try:
                 info = ydl.extract_info(f"ytsearch:{item}", download=False)['entries'][0]
             except Exception:
                 return False
-        return {"source": info["formats"][0]["url"], "title": info["title"], "duration": info["duration"]}
+        return {"source": info["formats"][0]["url"], "title": info["title"], "duration": info["duration"], "thumbnail": info["thumbnail"]}
+
+    def search_youtube_playlist(self, url, voice_channel):
+        """
+        Util method that takes care of fetching necessary info from a youtube url or item
+        to process on a later stage.
+        Params: 
+            * url: This is playlist url from youtube (Public or Unlisted)
+            * voice_channel: The voice channel the bot will play the song
+        Returns:
+            * relevant_data: The array with the source, title, thumbnail and duration 
+                        of the song along with the voice channel the audio will play.
+        """
+        with YoutubeDL(self.YDL_OPTIONS_PLAYLIST) as ydl:
+            try:
+                relevant_data = []
+                info = ydl.extract_info(url, download=False)["entries"]
+                for item in info:
+                    relevant_data.append([{
+                        "source": item["formats"][0]["url"],
+                        "title": item["title"],
+                        "duration": item["duration"],
+                        "thumbnail": item["thumbnail"]
+                    }, voice_channel])
+            except Exception:
+                return False
+        return relevant_data
     
     async def try_to_connect(self):
         """
@@ -53,12 +140,17 @@ class MusicCog(commands.Cog):
         the queue of music.
         """
         # Try to connect to a voice channel if you are not already connected
-        if self.vc == "" or not self.vc.is_connected():
-            self.vc = await self.music_queue[0][1].connect()
-        # elif self.vc != self.music_queue[0][1]:
-        #     # If the bot is connected but not in the same voice channel as you,
-        #     # move to that channel.
-        #     self.vc = await self.bot.move_to(self.music_queue[0][1])
+        if self.vc == "" or not self.vc:
+            try:
+                self.vc = await self.music_queue[0][1].connect()
+            except:
+                pass
+        elif self.vc.is_connected():
+            if self.vc.channel.name != self.music_queue[0][1].name:
+                # If the bot is connected but not in the same voice channel as you,
+                # move to that channel.
+                self.vc = await self.vc.disconnect()
+                self.vc = await self.music_queue[0][1].connect()
 
     def play_next(self):
         """
@@ -67,6 +159,12 @@ class MusicCog(commands.Cog):
         if len(self.music_queue) > 0:
             self.is_playing = True
             try:
+                if self.is_queue_shuffled == True:
+                    # Check if the queue is shuffled to update the queue.
+                    # We do this here before a new song starts!
+                    self.music_queue = self.shuffled_music_queue
+                    self.is_queue_shuffled = False
+
                 # Get the first url
                 next_song_url = self.music_queue[0][0]['source']
                 
@@ -75,11 +173,12 @@ class MusicCog(commands.Cog):
                 # is needed later.
                 if len(self.now_playing) > 0:
                     self.now_playing.pop()
-                self.now_playing.append(self.music_queue.pop(0))
+                self.now_playing.append(self.music_queue.pop(0)[0])
 
                 # The Voice Channel we are currently on will start playing the next song
                 # Once that song is over "after=lambda e: self.play_next()" will play the 
                 # next song if it there is another one queued.
+                self.is_playing = True
                 self.vc.play(discord.FFmpegPCMAudio(next_song_url, **self.FFMPEG_OPTIONS ), after=lambda e: self.play_next())
                 self.vc.source = discord.PCMVolumeTransformer(self.vc.source)
                 self.vc.source.volume = 0.7
@@ -89,10 +188,25 @@ class MusicCog(commands.Cog):
         else:
             self.is_playing = False
 
+    def convert_seconds(self, seconds):
+        """
+        Util method that takes seconds and turns them into string 
+        in the format hour, minutes and seconds.
+        Params:
+            * seconds: the amount of seconds to convert.
+        """
+        seconds = seconds % (24 * 3600)
+        hour = seconds // 3600
+        seconds %= 3600
+        minutes = seconds // 60
+        seconds %= 60
+        
+        return "%d:%02d:%02d" % (hour, minutes, seconds)
+
     ################################################################### COMMANDS METHODS #########################################################
 
-    @commands.command(name="rolela")
-    @commands.check(check_if_music_channel)
+    @commands.command(aliases=PLAY_COMMAND_ALIASES)
+    @commands.check(check_if_valid)
     async def play(self, context, *args):
         """
         Command for playing songs, this method will search for the youtube link and 
@@ -101,59 +215,127 @@ class MusicCog(commands.Cog):
             * context: Represents the context in which a command is being invoked under.
             * args: The link of the youtube video
         """
-        youtube_query = " ".join(args)
+        if await self.check_self_bot(context):
+            youtube_query = " ".join(args)
+            is_playlist = False
 
-        if context.author.voice is None:
-            # The user that perform this command was not in a voice channel
-            await context.send("Mae mamaste! No estas en un canal de voz")
-        else:
             voice_channel = context.author.voice.channel
-            song_info = self.search_youtube_url(youtube_query)
-            if not song_info: 
-                # This was done for the exception that search_youtube_url can throw if you try to
-                # reproduce a playlist or livestream. Search later if this can be avoided.
-                await context.send("Mae no se pudo descargar la cancion. Probablemente por ser una playlist o un livestream.")
-            else:
-                await context.send("Canción añadida a la colaヾ(•ω•`)o")
-                self.music_queue.append([song_info, voice_channel])
+            if "list" in youtube_query:
+                # This means it is a playlist
+                is_playlist = True
 
-                if self.is_playing == False:
-                    # Try to connect to a voice channel if you are not already connected
-                    await self.try_to_connect()
-                    self.play_next()
+            if is_playlist:
+                playlist_info = self.search_youtube_playlist(youtube_query, voice_channel)
+                if not playlist_info: 
+                    await context.send("Mae no se pudo poner la playlist.")
+                else:
+                    self.music_queue.extend(playlist_info)
+                    await context.send(f"{len(playlist_info)} canciones añadidas a la colaヾ(•ω•`)o")
+            else:    
+                song_info = self.search_youtube_url(youtube_query)
+                if not song_info: 
+                    # This was done for the exception that search_youtube_url can throw if you try to
+                    # reproduce a playlist or livestream. Search later if this can be avoided.
+                    await context.send("Mae no se pudo descargar la cancion. Probablemente por ser un livestream.")
+                else:
+                    print(song_info)
+                    self.music_queue.append([song_info, voice_channel])
+                    await context.send("Canción añadida a la colaヾ(•ω•`)o")
+
+            if self.is_playing == False:
+                # Try to connect to a voice channel if you are not already connected
+                await self.try_to_connect()
+                self.play_next()
 
 
-    @commands.command("cola")
-    @commands.check(check_if_music_channel)
+    @commands.command(aliases=QUEUE_COMMAND_ALIASES)
+    @commands.check(check_if_valid)
     async def queue(self, context):
         """
         Command that displays the songs currently on the music queue.
         Params:
             * context: Represents the context in which a command is being invoked under.
         """
-        if len(self.music_queue) > 0:
-            queue_display = ""
+        if await self.check_self_bot(context):
+            if len(self.music_queue) > 0:
+                queue_display = ""
 
-            for item in range(0, len(self.music_queue)):
-                queue_display += str(item) + " - " + self.music_queue[item][0]["title"] + "\n"
-            
-            await context.send(embed=
-                discord.Embed(
-                    title= "Lista de Canciones en cola", 
-                    color=discord.Color.blurple())
-                    .add_field(name="Canciones",value=queue_display)
-            )
-        else: 
-            await context.send("Actualmente no hay música en la cola 💔")
+                if self.is_queue_shuffled == True:
+                    # We want to show the user the queue shuffled if he calls this command
+                    # after shuffling the queue.
+                    for item in range(0, len(self.shuffled_music_queue)):
+                        queue_display += str(item+1) + " - " + self.shuffled_music_queue[item][0]["title"] + "\n"
+                else:
+                    for item in range(0, len(self.music_queue)):
+                        queue_display += str(item+1) + " - " + self.music_queue[item][0]["title"] + "\n"
+                
+                await context.send(embed=
+                    discord.Embed(
+                        title= "Lista de Canciones en cola", 
+                        color=discord.Color.blurple())
+                        .add_field(name="Canciones", value=queue_display)
+                )
+            else: 
+                await context.send("Actualmente no hay música en la cola 💔")
 
 
-    @commands.command("saltela")
-    @commands.check(check_if_music_channel)
+    @commands.command(aliases=SKIP_COMMAND_ALIASES)
+    @commands.check(check_if_valid)
     async def skip(self, context):
-        if self.vc != "": 
-            self.vs.stop()
-            # Try to play the next song in the queue if it exists
-            self.play_next()
+        """
+        Command that skip the current song playing on the bot.
+        Params:
+            * context: Represents the context in which a command is being invoked under.
+        """
+        if await self.check_self_bot(context):
+            if self.vc != "": 
+                if self.vc.is_playing():
+                    # This will trigger the lambda e function from play_next method to jump to the next song in queue
+                    self.vc.stop()
+                else:
+                    await context.send(f"{os.getenv('BOT_NAME', BOT_NAME)} no esta tocando ninguna canción")  
+            else:
+                await context.send(f"Actualmente {os.getenv('BOT_NAME', BOT_NAME)} no está en un canal de voz.")
+
+    
+    @commands.command(aliases=SHUFFLE_COMMAND_ALIASES)
+    @commands.check(check_if_valid)
+    async def shuffle(self, context):
+        """
+        Command that shuffles the order of the current songs on the music queue.
+        Params:
+            * context: Represents the context in which a command is being invoked under.
+        """
+        if await self.check_self_bot(context):
+            if len(self.music_queue) > 0:
+                numpy_array = np.array(self.music_queue)
+                np.random.shuffle(numpy_array)
+                self.shuffled_music_queue = numpy_array.tolist()
+                self.is_queue_shuffled = True
+            else:
+               await context.send("La cola no tiene canciones actualmente :c")
+
+
+    @commands.command(aliases=NOW_PLAYING_COMMAND_ALIASES)
+    @commands.check(check_if_valid)
+    async def now_playing(self, context):
+        """
+        Command that shows the info of the current song playing.
+        Params:
+            * context: Represents the context in which a command is being invoked under.
+        """
+        if await self.check_self_bot(context):
+            if self.is_playing:
+                await context.send(
+                    embed= discord.Embed(
+                        color=discord.Color.blurple())
+                        .add_field(name="Canción Actual", value=self.now_playing[0]["title"])
+                        .add_field(name="Duración", value=self.convert_seconds(self.now_playing[0]["duration"]))
+                        .set_thumbnail(url=self.now_playing[0]["thumbnail"])
+                )
+            else:
+               await context.send("Actualmente no se está tocando ninguna canción.") 
+    
     
     # @commands.command()
     # @commands.check(check_if_music_channel)
