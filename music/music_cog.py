@@ -22,6 +22,7 @@ class MusicCog(commands.Cog):
             "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
             "options": "-vn"
         }
+
         self.YDL_OPTIONS = {
             "format": "bestaudio",
             "postprocessors": [{
@@ -29,7 +30,6 @@ class MusicCog(commands.Cog):
                 "preferredcodec": "mp3",
                 "preferredquality": "192",
             }],
-            "cookiefile": COOKIE_FILE, # File to bypass age restrictions
             "simulate": True,
         }
 
@@ -40,7 +40,6 @@ class MusicCog(commands.Cog):
                 "preferredcodec": "mp3",
                 "preferredquality": "192",
             }],
-            "cookiefile": COOKIE_FILE, # File to bypass age restrictions
             "ignoreerrors": True, # Do not stop on download errors.
         }
         self.vc = "" # Stores current channel
@@ -101,6 +100,9 @@ class MusicCog(commands.Cog):
         Returns:
             * The source, title, thumbnail and duration of the youtube url.
         """
+        if bool(os.getenv("TEST_MODE")):
+            self.YDL_OPTIONS["cookiefile"] = COOKIE_FILE
+
         with YoutubeDL(self.YDL_OPTIONS) as ydl:
             try:
                 info = ydl.extract_info(f"ytsearch:{item}", download=False)['entries'][0]
@@ -119,6 +121,9 @@ class MusicCog(commands.Cog):
             * relevant_data: The array with the source, title, thumbnail and duration 
                         of the song along with the voice channel the audio will play.
         """
+        if bool(os.getenv("TEST_MODE")):
+            self.YDL_OPTIONS_PLAYLIST["cookiefile"] = COOKIE_FILE
+
         with YoutubeDL(self.YDL_OPTIONS_PLAYLIST) as ydl:
             try:
                 relevant_data = []
