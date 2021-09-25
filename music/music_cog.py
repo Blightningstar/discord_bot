@@ -1,5 +1,6 @@
 import discord
 import os
+import asyncio
 import numpy as np
 from discord.ext import commands
 from youtube_dl import YoutubeDL
@@ -12,11 +13,14 @@ from .music_commands import (
 class MusicCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+
         self.is_playing = False # To know when the bot is playing music
         self.is_queue_shuffled = False # To know when the queue has been shuffled.
-        self.music_queue = [] # [song, channel]
-        self.shuffled_music_queue = [] # [song, channel] used to store temporarily the shuffled queue, this avoids problems when a song is playing
-        self.now_playing = [] # [song]
+
+        self.music_queue = [] # [song, channel] The main music queue of songs to play
+        self.shuffled_music_queue = [] # [song, channel] used to store temporarily the shuffled queue, this avoids problems when a song is playing it stops.¿
+        self.now_playing = [] # [song] To display the info of the current song playing
+        self.embeded_queue = [] # The embed info of the queue embed messages.
 
         self.FFMPEG_OPTIONS = {
             "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
@@ -149,7 +153,7 @@ class MusicCog(commands.Cog):
             try:
                 self.vc = await self.music_queue[0][1].connect()
             except:
-                pass
+                print("Algo salio mal al conectar al bot.")
         elif self.vc.is_connected():
             if self.vc.channel.name != self.music_queue[0][1].name:
                 # If the bot is connected but not in the same voice channel as you,
@@ -208,6 +212,30 @@ class MusicCog(commands.Cog):
         
         return "%d:%02d:%02d" % (hour, minutes, seconds)
 
+    def add_embed_in_queue(self, list_of_songs):
+        """
+        Util method that adds the list of songs in currently in
+        queue to the embed_queue.
+        Params:
+            * list_of_songs: string with all the songs that will be
+            placed in an individual embed message.
+        """
+        if len(self.embeded_queue) == 0:
+            # First queue embed
+            self.embeded_queue.append(discord.Embed(
+                title= "Lista de Canciones en cola",
+                color=discord.Color.blurple())
+                .add_field(name="Canciones", value=list_of_songs)
+            )
+        else:
+             # All the rest needed
+            self.embeded_queue.append(discord.Embed(
+                title= "Lista de Canciones en cola",
+                description=f"Page {len(self.embeded_queue)+1}",
+                color=discord.Color.blurple())
+                .add_field(name="Canciones", value=list_of_songs)
+            )
+
     ################################################################### COMMANDS METHODS #########################################################
 
     @commands.command(aliases=PLAY_COMMAND_ALIASES)
@@ -263,23 +291,83 @@ class MusicCog(commands.Cog):
         """
         if await self.check_self_bot(context):
             if len(self.music_queue) > 0:
-                queue_display = ""
+                current = 0 # Current embed being displayed
+                queue_display_msg = ""  # Message added to field of embed object.
+                songs_added_to_embed = 0 # Each time a song is added to the embed queue.
+                queue_display_list = [] # Local list so when a song leaves the queue doesn't generate an index error.
+                self.embeded_queue = [] # We reset the embeded queue if multiple calls of queue command are done.
 
                 if self.is_queue_shuffled == True:
                     # We want to show the user the queue shuffled if he calls this command
                     # after shuffling the queue.
-                    for item in range(0, len(self.shuffled_music_queue)):
-                        queue_display += str(item+1) + " - " + self.shuffled_music_queue[item][0]["title"] + "\n"
+                    queue_display_list = self.shuffled_music_queue
+
                 else:
-                    for item in range(0, len(self.music_queue)):
-                        queue_display += str(item+1) + " - " + self.music_queue[item][0]["title"] + "\n"
-                
-                await context.send(embed=
-                    discord.Embed(
-                        title= "Lista de Canciones en cola", 
-                        color=discord.Color.blurple())
-                        .add_field(name="Canciones", value=queue_display)
-                )
+                    queue_display_list = self.music_queue
+
+
+                while songs_added_to_embed < len(queue_display_list):
+
+                    embed_message = queue_display_msg + str(songs_added_to_embed+1) + " - " + queue_display_list[songs_added_to_embed][0]["title"] + "\n"
+
+                    if len(embed_message) < 1024:
+                        # This means we reached the maximun that an embed field can handle.
+                        if songs_added_to_embed < len(queue_display_list):
+                            # If we haven't reached the end of the music_queue
+                            queue_display_msg += str(songs_added_to_embed+1) + " - " + queue_display_list[songs_added_to_embed][0]["title"] + "\n"
+                            songs_added_to_embed += 1
+
+                        if songs_added_to_embed == len(queue_display_list):
+                            # This means we add the last embed necessary to the
+                            # queue.
+                            self.add_embed_in_queue(queue_display_msg)
+                    else:
+                        # So we add that embed to the queue of usable embeds and reset the message
+                        # to fill as many other embeds as needed to show all songs in queue.
+                        self.add_embed_in_queue(queue_display_msg)
+                        queue_display_msg = ""
+
+                if len(self.embeded_queue) == 1:
+                    msg = await context.send(embed=self.embeded_queue[current], delete_after=60.0)
+                    
+                elif len(self.embeded_queue) > 1:
+                    buttons = [u"\u23EA", u"\u2B05", u"\u27A1", u"\u23E9"] # Skip to start, left, right, skip to end buttons.
+                    # We only need the pagination functionality if there are multiple embed queue pages.
+
+                    msg = await context.send(embed=self.embeded_queue[current])
+                    for button in buttons:
+                        await msg.add_reaction(button)
+    
+                    while True:
+                        try:
+                            reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: user == context.author and reaction.emoji in buttons, timeout=60.0)
+
+                        except asyncio.TimeoutError:
+                            await msg.delete()
+                            return print("QUEUE EMBED NATURAL TIMEOUT")
+
+                        else:
+                            previous_page = current
+                            if reaction.emoji == u"\u23EA": # Skip to Start
+                                current = 0
+                                
+                            elif reaction.emoji == u"\u2B05": # Previous queue page
+                                if current > 0:
+                                    current -= 1
+                                    
+                            elif reaction.emoji == u"\u27A1": # Next queue page
+                                if current < len(self.embeded_queue)-1:
+                                    current += 1
+
+                            elif reaction.emoji == u"\u23E9": # Last queue page
+                                current = len(self.embeded_queue)-1
+
+                            for button in buttons:
+                                await msg.remove_reaction(button, context.author)
+
+                            if current != previous_page:
+                                await msg.edit(embed=self.embeded_queue[current])
+
             else: 
                 await context.send("Actualmente no hay música en la cola 💔")
 
