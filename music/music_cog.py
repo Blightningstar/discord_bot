@@ -95,14 +95,15 @@ class MusicCog(commands.Cog):
             return False
         return True
 
-    def search_youtube_url(self, item):
+    def search_youtube_url(self, item, author):
         """
         Util method that takes care of fetching necessary info from a youtube url or item
         to process on a later stage.
         Params: 
             * item: This is the url from youtube
+            * author: The user who added the songs to the queue
         Returns:
-            * The source, title, thumbnail and duration of the youtube url.
+            * The all the required info of the youtube url.
         """
         if bool(os.getenv("TEST_MODE")):
             self.YDL_OPTIONS["cookiefile"] = COOKIE_FILE
@@ -112,18 +113,26 @@ class MusicCog(commands.Cog):
                 info = ydl.extract_info(f"ytsearch:{item}", download=False)['entries'][0]
             except Exception:
                 return False
-        return {"source": info["formats"][0]["url"], "title": info["title"], "duration": info["duration"], "thumbnail": info["thumbnail"]}
+        return {
+            "source": info["formats"][0]["url"], 
+            "title": info["title"], 
+            "duration": info["duration"], 
+            "thumbnail": info["thumbnail"],
+            "url": info["webpage_url"],
+            "author": author
+        }
 
-    def search_youtube_playlist(self, url, voice_channel):
+    def search_youtube_playlist(self, url, voice_channel, author):
         """
         Util method that takes care of fetching necessary info from a youtube url or item
         to process on a later stage.
         Params: 
             * url: This is playlist url from youtube (Public or Unlisted)
             * voice_channel: The voice channel the bot will play the song
+            * author: The user who added the songs to the queue
         Returns:
-            * relevant_data: The array with the source, title, thumbnail and duration 
-                        of the song along with the voice channel the audio will play.
+            * relevant_data: The array with necessary info of the song along with the 
+                            voice channel the audio will play.
         """
         if bool(os.getenv("TEST_MODE")):
             self.YDL_OPTIONS_PLAYLIST["cookiefile"] = COOKIE_FILE
@@ -137,7 +146,9 @@ class MusicCog(commands.Cog):
                         "source": item["formats"][0]["url"],
                         "title": item["title"],
                         "duration": item["duration"],
-                        "thumbnail": item["thumbnail"]
+                        "thumbnail": item["thumbnail"],
+                        "url": item["webpage_url"],
+                        "author": author
                     }, voice_channel])
             except Exception:
                 return False
@@ -220,21 +231,11 @@ class MusicCog(commands.Cog):
             * list_of_songs: string with all the songs that will be
             placed in an individual embed message.
         """
-        if len(self.embeded_queue) == 0:
-            # First queue embed
-            self.embeded_queue.append(discord.Embed(
-                title= "Lista de Canciones en cola",
-                color=discord.Color.blurple())
-                .add_field(name="Canciones", value=list_of_songs)
-            )
-        else:
-             # All the rest needed
-            self.embeded_queue.append(discord.Embed(
-                title= "Lista de Canciones en cola",
-                description=f"Page {len(self.embeded_queue)+1}",
-                color=discord.Color.blurple())
-                .add_field(name="Canciones", value=list_of_songs)
-            )
+        self.embeded_queue.append(discord.Embed(
+            title= "Lista de Canciones en cola 🍆",
+            color=discord.Color.blurple())
+            .add_field(name="Canciones", value=list_of_songs, inline=False)
+        )
 
     ################################################################### COMMANDS METHODS #########################################################
 
@@ -258,14 +259,14 @@ class MusicCog(commands.Cog):
                 is_playlist = True
 
             if is_playlist:
-                playlist_info = self.search_youtube_playlist(youtube_query, voice_channel)
+                playlist_info = self.search_youtube_playlist(youtube_query, voice_channel, context.author.nick)
                 if not playlist_info: 
                     await context.send("Mae no se pudo poner la playlist.")
                 else:
                     self.music_queue.extend(playlist_info)
                     await context.send(f"{len(playlist_info)} canciones añadidas a la colaヾ(•ω•`)o")
             else:    
-                song_info = self.search_youtube_url(youtube_query)
+                song_info = self.search_youtube_url(youtube_query, context.author.nick)
                 if not song_info: 
                     # This was done for the exception that search_youtube_url can throw if you try to
                     # reproduce a playlist or livestream. Search later if this can be avoided.
@@ -293,9 +294,10 @@ class MusicCog(commands.Cog):
             if len(self.music_queue) > 0:
                 current = 0 # Current embed being displayed
                 queue_display_msg = ""  # Message added to field of embed object.
-                songs_added_to_embed = 0 # Each time a song is added to the embed queue.
+                embed_songs = 0 # Each time a song is added to the embed queue.
                 queue_display_list = [] # Local list so when a song leaves the queue doesn't generate an index error.
                 self.embeded_queue = [] # We reset the embeded queue if multiple calls of queue command are done.
+                queue_duration = 0 # Total duration of all the songs in queue.
 
                 if self.is_queue_shuffled == True:
                     # We want to show the user the queue shuffled if he calls this command
@@ -306,18 +308,23 @@ class MusicCog(commands.Cog):
                     queue_display_list = self.music_queue
 
 
-                while songs_added_to_embed < len(queue_display_list):
+                while embed_songs < len(queue_display_list):
+                    title = queue_display_list[embed_songs][0]["title"]
+                    url = queue_display_list[embed_songs][0]["url"]
+                    duration = queue_display_list[embed_songs][0]["duration"]
+                    author = queue_display_list[embed_songs][0]["author"]
 
-                    embed_message = queue_display_msg + str(songs_added_to_embed+1) + " - " + queue_display_list[songs_added_to_embed][0]["title"] + "\n"
+                    embed_message = f"`{queue_display_msg}{str(embed_songs+1)} -` [{title}]({url})|`{self.convert_seconds(duration)} ({author})`\n"
 
                     if len(embed_message) < 1024:
                         # This means we reached the maximun that an embed field can handle.
-                        if songs_added_to_embed < len(queue_display_list):
+                        if embed_songs < len(queue_display_list):
                             # If we haven't reached the end of the music_queue
-                            queue_display_msg += str(songs_added_to_embed+1) + " - " + queue_display_list[songs_added_to_embed][0]["title"] + "\n"
-                            songs_added_to_embed += 1
+                            queue_display_msg += f"`{str(embed_songs+1)} -` [{title}]({url})|`{self.convert_seconds(duration)} ({author})`\n"
+                            queue_duration += duration
+                            embed_songs += 1
 
-                        if songs_added_to_embed == len(queue_display_list):
+                        if embed_songs == len(queue_display_list):
                             # This means we add the last embed necessary to the
                             # queue.
                             self.add_embed_in_queue(queue_display_msg)
@@ -328,11 +335,22 @@ class MusicCog(commands.Cog):
                         queue_display_msg = ""
 
                 if len(self.embeded_queue) == 1:
-                    msg = await context.send(embed=self.embeded_queue[current], delete_after=60.0)
+                    embeded_queue_item = self.embeded_queue[current]
+                    if len(queue_display_list) == 1:
+                        embeded_queue_item.add_field(name="\u200b", value=f"**{len(queue_display_list)} song in queue | {self.convert_seconds(queue_duration)} queue duration**", inline=False)
+                    else:
+                        embeded_queue_item.add_field(name="\u200b", value=f"**{len(queue_display_list)} songs in queue | {self.convert_seconds(queue_duration)} queue duration**", inline=False)
+
+                    embeded_queue_item.set_footer(text=f"Page 1/1", icon_url="https://cdn-icons-png.flaticon.com/512/1384/1384061.png")
+                    msg = await context.send(embed=embeded_queue_item, delete_after=60.0)
                     
                 elif len(self.embeded_queue) > 1:
                     buttons = [u"\u23EA", u"\u2B05", u"\u27A1", u"\u23E9"] # Skip to start, left, right, skip to end buttons.
                     # We only need the pagination functionality if there are multiple embed queue pages.
+
+                    embeded_queue_item = self.embeded_queue[current]
+                    embeded_queue_item.add_field(name="\u200b", value=f"**{len(queue_display_list)} songs in queue | {self.convert_seconds(queue_duration)} queue duration**", inline=False)
+                    embeded_queue_item.set_footer(text=f"Page {current+1}/{len(self.embeded_queue)}", icon_url="https://cdn-icons-png.flaticon.com/512/1384/1384061.png")
 
                     msg = await context.send(embed=self.embeded_queue[current])
                     for button in buttons:
@@ -366,7 +384,15 @@ class MusicCog(commands.Cog):
                                 await msg.remove_reaction(button, context.author)
 
                             if current != previous_page:
-                                await msg.edit(embed=self.embeded_queue[current])
+                                embeded_queue_item = self.embeded_queue[current]
+
+                                if len(embeded_queue_item.fields) > 1: # If the info field was already added just modify it instead of re adding it.
+                                    embeded_queue_item.set_field_at(index=1 ,name="\u200b", value=f"**{len(queue_display_list)} songs in queue | {self.convert_seconds(queue_duration)} queue duration**", inline=False)
+                                else:
+                                    embeded_queue_item.add_field(name="\u200b", value=f"**{len(queue_display_list)} songs in queue | {self.convert_seconds(queue_duration)} queue duration**", inline=False)
+                                
+                                embeded_queue_item.set_footer(text=f"Page {current+1}/{len(self.embeded_queue)}", icon_url="https://cdn-icons-png.flaticon.com/512/1384/1384061.png")
+                                await msg.edit(embed=embeded_queue_item)
 
             else: 
                 await context.send("Actualmente no hay música en la cola 💔")
@@ -405,6 +431,7 @@ class MusicCog(commands.Cog):
                 np.random.shuffle(numpy_array)
                 self.shuffled_music_queue = numpy_array.tolist()
                 self.is_queue_shuffled = True
+                await context.send("La cola hizo brrr c:")
             else:
                await context.send("La cola no tiene canciones actualmente :c")
 
@@ -419,12 +446,20 @@ class MusicCog(commands.Cog):
         """
         if await self.check_self_bot(context):
             if self.is_playing:
+                title = self.now_playing[0]["title"]
+                url = self.now_playing[0]["url"]
+                author = self.now_playing[0]["author"]
+                duration = self.now_playing[0]["duration"]
+
+                # [{title}]({url})
                 await context.send(
                     embed= discord.Embed(
                         color=discord.Color.blurple())
-                        .add_field(name="Canción Actual", value=self.now_playing[0]["title"])
-                        .add_field(name="Duración", value=self.convert_seconds(self.now_playing[0]["duration"]))
+                        .add_field(name="Canción Actual", value=f"[{title}]({url})")
+                        .add_field(name="Duración", value=self.convert_seconds(duration))
+                        .add_field(name="Added by", value=author)
                         .set_thumbnail(url=self.now_playing[0]["thumbnail"])
+                        , delete_after=60.0
                 )
             else:
                await context.send("Actualmente no se está tocando ninguna canción.") 
