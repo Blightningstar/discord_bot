@@ -8,6 +8,7 @@ youtube-dl = "*"
 discord = "*"
 PyNaCl = "*"
 numpy = "*"
+requests = "*"
 
 [dev-packages]
 

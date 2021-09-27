@@ -12,3 +12,6 @@ SHUFFLE_COMMAND_ALIASES = ["barajela","mezclela", "b", "m"]
 
 ############################### Now Playing Command
 NOW_PLAYING_COMMAND_ALIASES = ["np","cual", "cual suena"]
+
+############################### Join Command
+JOIN_COMMAND_ALIASES = ["unete","u", "j"]

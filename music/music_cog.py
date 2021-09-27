@@ -2,13 +2,14 @@ import discord
 import os
 import asyncio
 import numpy as np
+import json, requests
 from discord.ext import commands
 from youtube_dl import YoutubeDL
 from settings import BOT_NAME, COOKIE_FILE
 from .music_commands import (
     PLAY_COMMAND_ALIASES, QUEUE_COMMAND_ALIASES, 
     SKIP_COMMAND_ALIASES, SHUFFLE_COMMAND_ALIASES, 
-    NOW_PLAYING_COMMAND_ALIASES)
+    NOW_PLAYING_COMMAND_ALIASES, JOIN_COMMAND_ALIASES)
 
 class MusicCog(commands.Cog):
     def __init__(self, bot):
@@ -21,6 +22,8 @@ class MusicCog(commands.Cog):
         self.shuffled_music_queue = [] # [song, channel] used to store temporarily the shuffled queue, this avoids problems when a song is playing it stops.¿
         self.now_playing = [] # [song] To display the info of the current song playing
         self.embeded_queue = [] # The embed info of the queue embed messages.
+        self.entries_of_playlist = 0 # This is to keep track of the amount of songs in a playlist.
+        self.processing_playlist = False # This keeps track if a playlist is being processed by the search_youtube_playlist method.
 
         self.FFMPEG_OPTIONS = {
             "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
@@ -95,6 +98,43 @@ class MusicCog(commands.Cog):
             return False
         return True
 
+    def get_youtube_playlist_lenght(self, url):
+        """
+        Util Method that requests via Youtube API the song id's of a playlist.
+        Params:
+            * url: the url of the youtube playlist.
+        Returns:
+            * video_count: The amount of videos inside the youtube playlist.
+            * video_list: A list with all the ids of the videos from the youtube playlist. 
+        """
+        youtube_api_key = os.getenv("YT_API_KEY")
+
+        playlist_id = url.split("list=")[1]
+
+        URL1 = "https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&maxResults=50&fields=items/contentDetails/videoId,nextPageToken&key={}&playlistId={}&pageToken=".format(youtube_api_key, playlist_id)
+    
+        next_page = ""
+        video_count = 0
+        video_list = []
+
+        while True:
+            videos_in_page = [] 
+            # headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:92.0) Gecko/20100101 Firefox/92.0"}
+            results = json.loads(requests.get(URL1 + next_page).text)
+            
+            for item in results["items"]:
+                videos_in_page.append(item["contentDetails"]["videoId"])
+                
+            video_list.extend(videos_in_page)
+            video_count += len(videos_in_page)
+
+            if "nextPageToken" in results:
+                next_page = results["nextPageToken"]
+            else:
+                print("No. of videos: " + str(video_count))
+                break
+        return video_count, video_list
+
     def search_youtube_url(self, item, author):
         """
         Util method that takes care of fetching necessary info from a youtube url or item
@@ -103,14 +143,14 @@ class MusicCog(commands.Cog):
             * item: This is the url from youtube
             * author: The user who added the songs to the queue
         Returns:
-            * The all the required info of the youtube url.
+            * All the required info of the youtube url.
         """
         if bool(os.getenv("TEST_MODE")):
             self.YDL_OPTIONS["cookiefile"] = COOKIE_FILE
 
         with YoutubeDL(self.YDL_OPTIONS) as ydl:
             try:
-                info = ydl.extract_info(f"ytsearch:{item}", download=False)['entries'][0]
+                info = ydl.extract_info(f"ytsearch:{item}", download=False)["entries"][0]
             except Exception:
                 return False
         return {
@@ -136,41 +176,74 @@ class MusicCog(commands.Cog):
         """
         if bool(os.getenv("TEST_MODE")):
             self.YDL_OPTIONS_PLAYLIST["cookiefile"] = COOKIE_FILE
+        
+        item = 0
+        relevant_data = []
+        self.processing_playlist = True
 
+        self.entries_of_playlist, video_ids = self.get_youtube_playlist_lenght(url)
+        
         with YoutubeDL(self.YDL_OPTIONS_PLAYLIST) as ydl:
-            try:
-                relevant_data = []
-                info = ydl.extract_info(url, download=False)["entries"]
-                for item in info:
+            while item < (self.entries_of_playlist):
+                video_url = f"https://youtu.be/{video_ids[item]}"
+                try:
+                    info = ydl.extract_info(video_url, download=False)
                     relevant_data.append([{
-                        "source": item["formats"][0]["url"],
-                        "title": item["title"],
-                        "duration": item["duration"],
-                        "thumbnail": item["thumbnail"],
-                        "url": item["webpage_url"],
+                        "source": info["formats"][0]["url"], 
+                        "title": info["title"], 
+                        "duration": info["duration"], 
+                        "thumbnail": info["thumbnail"],
+                        "url": info["webpage_url"],
                         "author": author
                     }, voice_channel])
-            except Exception:
-                return False
-        return relevant_data
+                    yield relevant_data
+                    relevant_data = []
+                    item += 1
+                except Exception as e:
+                    print(f"Error while fetching data of {video_ids[item]}: {e}")
+                    relevant_data = []
+                    item += 1
+        self.processing_playlist = False
+        self.entries_of_playlist = 0
     
-    async def try_to_connect(self):
+    async def try_to_connect(self, voice_channel=None):
         """
         Util method in charge of connecting for the first time the bot to start playing
         the queue of music.
+        Params:
+            * voice_channel: it is used to determine if the bot is joining the bot channel
+            by the join command or play command.
         """
-        # Try to connect to a voice channel if you are not already connected
-        if self.vc == "" or not self.vc:
-            try:
-                self.vc = await self.music_queue[0][1].connect()
-            except:
-                print("Algo salio mal al conectar al bot.")
-        elif self.vc.is_connected():
-            if self.vc.channel.name != self.music_queue[0][1].name:
-                # If the bot is connected but not in the same voice channel as you,
-                # move to that channel.
-                self.vc = await self.vc.disconnect()
-                self.vc = await self.music_queue[0][1].connect()
+        if voice_channel is None: # The play command will join the bot to the voice_channel
+            connected = False
+            # Try to connect to a voice channel if you are not already connected
+            if self.vc == "" or not self.vc:
+                while connected == False:
+                    try:
+                        self.vc = await asyncio.shield(self.music_queue[0][1].connect())
+                        if self.vc.is_connected():
+                            connected = True
+                    except:
+                        print("Algo salio mal al conectar al bot.")
+
+            elif self.vc.is_connected():
+                if self.vc.channel.name != self.music_queue[0][1].name:
+                    # If the bot is connected but not in the same voice channel as you,
+                    # move to that channel.
+                    self.vc = await self.vc.disconnect()
+                    self.vc = await self.music_queue[0][1].connect()
+
+        else: # The join command will join the bot to the voice channel
+            if self.vc == "" or not self.vc:
+                self.vc = await asyncio.shield(voice_channel.connect())
+
+            elif self.vc.is_connected():
+                if self.vc.channel.name != voice_channel.name:
+                    # If the bot is connected but not in the same voice channel as you,
+                    # move to that channel.
+                    self.vc = await self.vc.disconnect()
+                    self.vc = await voice_channel.connect()
+
 
     def play_next(self):
         """
@@ -186,7 +259,7 @@ class MusicCog(commands.Cog):
                     self.is_queue_shuffled = False
 
                 # Get the first url
-                next_song_url = self.music_queue[0][0]['source']
+                next_song_url = self.music_queue[0][0]["source"]
                 
                 # Remove the first element of the queue as we will be playing it
                 # Add that element to the now_playing array if this information
@@ -198,12 +271,12 @@ class MusicCog(commands.Cog):
                 # The Voice Channel we are currently on will start playing the next song
                 # Once that song is over "after=lambda e: self.play_next()" will play the 
                 # next song if it there is another one queued.
-                self.is_playing = True
                 self.vc.play(discord.FFmpegPCMAudio(next_song_url, **self.FFMPEG_OPTIONS ), after=lambda e: self.play_next())
                 self.vc.source = discord.PCMVolumeTransformer(self.vc.source)
                 self.vc.source.volume = 0.7
 
-            except Exception:
+            except Exception as e:
+                print(e)
                 self.is_playing = False
         else:
             self.is_playing = False
@@ -252,6 +325,7 @@ class MusicCog(commands.Cog):
         if await self.check_self_bot(context):
             youtube_query = " ".join(args)
             is_playlist = False
+            amount_songs_added_from_playlist = 0
 
             voice_channel = context.author.voice.channel
             if "list" in youtube_query:
@@ -259,12 +333,21 @@ class MusicCog(commands.Cog):
                 is_playlist = True
 
             if is_playlist:
+
                 playlist_info = self.search_youtube_playlist(youtube_query, voice_channel, context.author.nick)
                 if not playlist_info: 
                     await context.send("Mae no se pudo poner la playlist.")
                 else:
-                    self.music_queue.extend(playlist_info)
-                    await context.send(f"{len(playlist_info)} canciones añadidas a la colaヾ(•ω•`)o")
+                    for item in playlist_info:
+                        self.music_queue.extend(item)
+                        amount_songs_added_from_playlist += 1
+                        if amount_songs_added_from_playlist == 1:
+                            if self.is_playing == False:
+                                # Try to connect to a voice channel if you are not already connected
+                                await self.try_to_connect()
+                                self.play_next()
+
+                    await context.send(f"{amount_songs_added_from_playlist} canciones añadidas a la colaヾ(•ω•`)o")
             else:    
                 song_info = self.search_youtube_url(youtube_query, context.author.nick)
                 if not song_info: 
@@ -412,7 +495,7 @@ class MusicCog(commands.Cog):
                     # This will trigger the lambda e function from play_next method to jump to the next song in queue
                     self.vc.stop()
                 else:
-                    await context.send(f"{os.getenv('BOT_NAME', BOT_NAME)} no esta tocando ninguna canción")  
+                    await context.send(f"{os.getenv('BOT_NAME', BOT_NAME)} no esta tocando ninguna canción.")  
             else:
                 await context.send(f"Actualmente {os.getenv('BOT_NAME', BOT_NAME)} no está en un canal de voz.")
 
@@ -464,12 +547,16 @@ class MusicCog(commands.Cog):
             else:
                await context.send("Actualmente no se está tocando ninguna canción.") 
     
-    
+    @commands.command(aliases=JOIN_COMMAND_ALIASES)
+    @commands.check(check_if_valid)
+    async def join(self, context):
+        await self.try_to_connect(context.author.voice.channel)
+
     # @commands.command()
     # @commands.check(check_if_music_channel)
     # async def disconnect(self, context):
         #if not ctx.voice_state.voice:
-        #     return await ctx.send('Not connected to any voice channel.')
+        #     return await ctx.send("Not connected to any voice channel.")
 
         # await ctx.voice_state.stop()
         # del self.voice_states[ctx.guild.id]
