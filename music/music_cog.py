@@ -147,7 +147,7 @@ class MusicCog(commands.Cog):
         Returns:
             * All the required info of the youtube url.
         """
-        if bool(os.getenv("TEST_MODE")):
+        if os.getenv("TEST_MODE") == True:
             self.YDL_OPTIONS["cookiefile"] = COOKIE_FILE
 
         with YoutubeDL(self.YDL_OPTIONS) as ydl:
@@ -176,7 +176,7 @@ class MusicCog(commands.Cog):
             * relevant_data: The array with necessary info of the song along with the 
                             voice channel the audio will play.
         """
-        if bool(os.getenv("TEST_MODE")):
+        if os.getenv("TEST_MODE") == True:
             self.YDL_OPTIONS_PLAYLIST["cookiefile"] = COOKIE_FILE
         
         item = 0
