@@ -9,21 +9,23 @@ from settings import BOT_NAME, COOKIE_FILE
 from .music_commands import (
     PLAY_COMMAND_ALIASES, QUEUE_COMMAND_ALIASES, 
     SKIP_COMMAND_ALIASES, SHUFFLE_COMMAND_ALIASES, 
-    NOW_PLAYING_COMMAND_ALIASES, JOIN_COMMAND_ALIASES)
+    NOW_PLAYING_COMMAND_ALIASES, JOIN_COMMAND_ALIASES,
+    PAUSE_COMMAND_ALIASES, RESUME_COMMAND_ALIASES)
 
 class MusicCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
         self.is_playing = False # To know when the bot is playing music
-        self.is_queue_shuffled = False # To know when the queue has been shuffled.
+        self.is_queue_shuffled = False # To know when the queue has been shuffled
+        self.is_paused = False # To know when the bot is paused
 
         self.music_queue = [] # [song, channel] The main music queue of songs to play
-        self.shuffled_music_queue = [] # [song, channel] used to store temporarily the shuffled queue, this avoids problems when a song is playing it stops.¿
+        self.shuffled_music_queue = [] # [song, channel] used to store temporarily the shuffled queue, this avoids problems when a song is playing it stops
         self.now_playing = [] # [song] To display the info of the current song playing
-        self.embeded_queue = [] # The embed info of the queue embed messages.
-        self.entries_of_playlist = 0 # This is to keep track of the amount of songs in a playlist.
-        self.processing_playlist = False # This keeps track if a playlist is being processed by the search_youtube_playlist method.
+        self.embeded_queue = [] # The embed info of the queue embed messages
+        self.entries_of_playlist = 0 # This is to keep track of the amount of songs in a playlist
+        self.processing_playlist = False # This keeps track if a playlist is being processed by the search_youtube_playlist method
 
         self.FFMPEG_OPTIONS = {
             "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
@@ -342,7 +344,7 @@ class MusicCog(commands.Cog):
                         self.music_queue.extend(item)
                         amount_songs_added_from_playlist += 1
                         if amount_songs_added_from_playlist == 1:
-                            if self.is_playing == False:
+                            if self.is_playing == False and self.is_paused == False:
                                 # Try to connect to a voice channel if you are not already connected
                                 await self.try_to_connect()
                                 self.play_next()
@@ -359,7 +361,7 @@ class MusicCog(commands.Cog):
                     self.music_queue.append([song_info, voice_channel])
                     await context.send("Canción añadida a la colaヾ(•ω•`)o")
 
-            if self.is_playing == False:
+            if self.is_playing == False and self.is_paused == False:
                 # Try to connect to a voice channel if you are not already connected
                 await self.try_to_connect()
                 self.play_next()
@@ -551,6 +553,27 @@ class MusicCog(commands.Cog):
     @commands.check(check_if_valid)
     async def join(self, context):
         await self.try_to_connect(context.author.voice.channel)
+
+    @commands.command(aliases=PAUSE_COMMAND_ALIASES)
+    @commands.check(check_if_valid)
+    async def pause(self, context):
+        if await self.check_self_bot(context):
+            if self.is_playing and self.vc != "":
+                self.vc.pause()
+                self.is_paused = True
+                self.is_playing = False
+                await context.send(f"Al {os.getenv('BOT_NAME', BOT_NAME)} se le paró ...la canción (╹ڡ╹ )")
+    
+    @commands.command(aliases=RESUME_COMMAND_ALIASES)
+    @commands.check(check_if_valid)
+    async def resume(self, context):
+        if await self.check_self_bot(context):
+            if self.is_paused == True and self.vc != "":
+                self.vc.resume()
+                self.is_paused = False
+                self.is_playing = True
+                await context.send(f"El {os.getenv('BOT_NAME', BOT_NAME)} seguirá tocando ...la canción ♪(´▽｀)") 
+
 
     # @commands.command()
     # @commands.check(check_if_music_channel)

@@ -15,3 +15,9 @@ NOW_PLAYING_COMMAND_ALIASES = ["np","cual", "cual suena"]
 
 ############################### Join Command
 JOIN_COMMAND_ALIASES = ["unete","u", "j"]
+
+############################### Pause Command
+PAUSE_COMMAND_ALIASES = ["pausa","detain", "d", "pa", "pare"]
+
+############################### Resume Command
+RESUME_COMMAND_ALIASES = ["siga","continue", "re"]
