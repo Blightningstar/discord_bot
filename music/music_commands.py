@@ -8,10 +8,10 @@ QUEUE_COMMAND_ALIASES = ["cola","c","q"]
 SKIP_COMMAND_ALIASES = ["saltela","s"]
 
 ############################### Shuffle Command
-SHUFFLE_COMMAND_ALIASES = ["barajela","mezclela", "b", "m"]
+SHUFFLE_COMMAND_ALIASES = ["barajela", "b"]
 
 ############################### Now Playing Command
-NOW_PLAYING_COMMAND_ALIASES = ["np","cual", "cual suena"]
+NOW_PLAYING_COMMAND_ALIASES = ["np","cual", "cual suena", "zelda", "z"]
 
 ############################### Join Command
 JOIN_COMMAND_ALIASES = ["unete","u", "j"]
@@ -21,3 +21,6 @@ PAUSE_COMMAND_ALIASES = ["pausa","detain", "d", "pa", "pare"]
 
 ############################### Resume Command
 RESUME_COMMAND_ALIASES = ["siga","continue", "re"]
+
+############################### Move Command
+MOVE_COMMAND_ALIASES = ["mueva","m", "coleme"]

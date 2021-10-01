@@ -10,7 +10,8 @@ from .music_commands import (
     PLAY_COMMAND_ALIASES, QUEUE_COMMAND_ALIASES, 
     SKIP_COMMAND_ALIASES, SHUFFLE_COMMAND_ALIASES, 
     NOW_PLAYING_COMMAND_ALIASES, JOIN_COMMAND_ALIASES,
-    PAUSE_COMMAND_ALIASES, RESUME_COMMAND_ALIASES)
+    PAUSE_COMMAND_ALIASES, RESUME_COMMAND_ALIASES,
+    MOVE_COMMAND_ALIASES)
 
 class MusicCog(commands.Cog):
     def __init__(self, bot):
@@ -322,7 +323,7 @@ class MusicCog(commands.Cog):
         add the song to the queue and start playing songs if the bot isn't playing already.
         Params:
             * context: Represents the context in which a command is being invoked under.
-            * args: The link of the youtube video
+            * args: The link of the youtube video or youtube search text
         """
         if await self.check_self_bot(context):
             youtube_query = " ".join(args)
@@ -549,14 +550,26 @@ class MusicCog(commands.Cog):
             else:
                await context.send("Actualmente no se está tocando ninguna canción.") 
     
+
     @commands.command(aliases=JOIN_COMMAND_ALIASES)
     @commands.check(check_if_valid)
     async def join(self, context):
+        """
+        Command that jons the bot to a voice channel.
+        Params:
+            * context: Represents the context in which a command is being invoked under.
+        """
         await self.try_to_connect(context.author.voice.channel)
+
 
     @commands.command(aliases=PAUSE_COMMAND_ALIASES)
     @commands.check(check_if_valid)
     async def pause(self, context):
+        """
+        Command that pauses the music bot in the voice channel.
+        Params:
+            * context: Represents the context in which a command is being invoked under.
+        """
         if await self.check_self_bot(context):
             if self.is_playing and self.vc != "":
                 self.vc.pause()
@@ -564,15 +577,60 @@ class MusicCog(commands.Cog):
                 self.is_playing = False
                 await context.send(f"Al {os.getenv('BOT_NAME', BOT_NAME)} se le paró ...la canción (╹ڡ╹ )")
     
+
     @commands.command(aliases=RESUME_COMMAND_ALIASES)
     @commands.check(check_if_valid)
     async def resume(self, context):
+        """
+        Command that resumes the pauses music bot in the voice channel.
+        Params:
+            * context: Represents the context in which a command is being invoked under.
+        """
         if await self.check_self_bot(context):
             if self.is_paused == True and self.vc != "":
                 self.vc.resume()
                 self.is_paused = False
                 self.is_playing = True
                 await context.send(f"El {os.getenv('BOT_NAME', BOT_NAME)} seguirá tocando ...la canción ♪(´▽｀)") 
+
+
+    @commands.command(aliases=MOVE_COMMAND_ALIASES)
+    @commands.check(check_if_valid)
+    async def move(self, context, *args):
+        """
+        Command for moving a song from position X to position Y
+        Params:
+            * context: Represents the context in which a command is being invoked under.
+            * args: The numerical position to move in the queue.
+        """
+        if await self.check_self_bot(context):
+            if len(self.music_queue) > 0:
+                positions =  " ".join(args).split(" ")
+                if len(positions) < 3 and positions[0] != "":
+                    # This command only works for 1 or 2 parameters.
+                    if len(positions) == 2: # Logic when 2 paramaters move X Y = move X -> Y
+                        position_one = int(positions[0])-1
+                        position_two = int(positions[1])-1
+
+                        if position_one >= 0 or position_two >= 0:
+                            insert_this_item = self.music_queue.pop(position_one)
+                            self.music_queue.insert(position_two, insert_this_item)
+                            await context.send(f"{insert_this_item[0]['title']} reprogramada a la posición {position_two+1}! ✪ ω ✪")
+                        else:
+                            await context.send("Los parámetros deben ser mayores a 0!")  
+                    else: # Logic when only 1 paramater move X = move X -> 1
+                        position_one = int(positions[0])-1
+                        if position_one >= 0:
+                            insert_this_item = self.music_queue.pop(position_one)
+                            self.music_queue.insert(0, insert_this_item)
+                            await context.send(f"{insert_this_item[0]['title']} reprogramada a la posición 1! ✪ ω ✪")
+                else:
+                    await context.send("Woa woa alto ahí, este comando solo permite a lo más 1 o 2 parámetros.")  
+            else:
+                await context.send("Actualmente no hay música en la cola 💔")
+
+
+            
 
 
     # @commands.command()
