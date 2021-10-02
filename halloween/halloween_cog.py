@@ -94,45 +94,47 @@ class HalloweenCog(commands.Cog):
 
     async def arm_story(self, story_info, context):
         current = 0 # Current embed being displayed
-        # queue_display_msg = ""  # Message added to field of embed object.
         self.embeds_queue = [] # We reset the embed queue if multiple calls of queue command are done.
-        # characters_added = 0
-        # embed_message = ""
+    
+        queue_display_msg = ""  # Message added to field of embed object.
+        characters_added = 0
+        embed_message = ""
 
         title = story_info["title"]
         story = story_info["body"]
         max_characters_per_embed = 1024
-        story_split_for_embeds = [story[i:i+max_characters_per_embed] for i in range(0, len(story), max_characters_per_embed)]
-        for text in story_split_for_embeds:
-            self.add_embed_in_queue(title, text)
 
-
-        # while characters_added < len(story_info["body"]):
-        #     embed_message += story[characters_added]
+        while characters_added < len(story_info["body"]):
+            embed_message += story[characters_added]
     
-        #     if len(embed_message) < max_characters_per_embed:
-        #         queue_display_msg += story[characters_added]
-        #         characters_added += 1
+            if len(embed_message) < max_characters_per_embed:
+                queue_display_msg += story[characters_added]
+                characters_added += 1
 
-        #         if characters_added == len(story_info["body"]):
-        #             self.add_embed_in_queue(title, queue_display_msg)
-        #     else:  
-        #         print(queue_display_msg[len(queue_display_msg)-1])
-        #         if queue_display_msg[len(queue_display_msg)-1] == " ":
-        #             self.add_embed_in_queue(title, queue_display_msg)
-        #             queue_display_msg = ""
-        #         else:
-        #             i = len(queue_display_msg)
-        #             we_are_not_cutting_words = False
-        #             while we_are_not_cutting_words == False:
-        #                 #We need to not cut words
-        #                 if queue_display_msg[i] != " ":
-        #                     queue_display_msg[i].pop()
-        #                     i -= 1
-        #                 else:
-        #                     we_are_not_cutting_words = True
-        #                     characters_added -= i
-        #                     self.add_embed_in_queue(title, queue_display_msg)
+                if characters_added == len(story_info["body"]):
+                    self.add_embed_in_queue(title, queue_display_msg)
+            else:  
+                if queue_display_msg[len(queue_display_msg)-1] == " ":
+                    self.add_embed_in_queue(title, queue_display_msg)
+                    queue_display_msg = ""
+                    embed_message = ""
+                else:
+                    i = len(queue_display_msg)-1
+                    last_position = i
+                    characters_deleted = 0
+                    we_are_not_cutting_words = False
+                    while we_are_not_cutting_words == False:
+                        #We need to not cut words
+                        if queue_display_msg[i] != " ":
+                            i -= 1
+                            characters_deleted += 1
+                        else:
+
+                            we_are_not_cutting_words = True
+                            characters_added -= characters_deleted              
+                            self.add_embed_in_queue(title, queue_display_msg[:-characters_deleted]) # Get all except the cutted word. 
+                            queue_display_msg = ""
+                            embed_message = ""
 
 
 
