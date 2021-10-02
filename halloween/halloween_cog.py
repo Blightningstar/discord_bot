@@ -195,18 +195,14 @@ class HalloweenCog(commands.Cog):
     async def creepy_pasta(self, context):
         start_date = datetime.strptime(datetime.now(self.tz).strftime("%d/%m/%Y"), "%d/%m/%Y").date()
         current_day = datetime.now(self.tz).strftime('%-d')
-        if start_date < self.final_date:
+        if start_date <= self.final_date:
             remainding_days = str(31-int(current_day))
-            await context.send(f"Boo! Feliz {current_day} de Octubre! Faltan {remainding_days} días para Halloween! 🎃")
+            
+            if start_date < self.final_date:
+                await context.send(f"Boo! Feliz {current_day} de Octubre! Faltan {remainding_days} días para Halloween! 🎃")
+            elif start_date == self.final_date:
+                await context.send("Muahahaha bienvenidos a Halloween, aquí está su última historia... 🎃")
 
-            story_info = self.fetch_story(self.list_of_creepy_pastas[int(current_day)-1])
-            file = open("halloween/stories_telled.txt", "w")
-            file.write(current_day)
-            file.close()
-            await self.arm_story(story_info, context)
-
-        elif start_date == self.final_date:
-            await context.send("Muahahaha bienvenidos a Halloween, aquí está su ultima historia... 🎃")
             story_info = self.fetch_story(self.list_of_creepy_pastas[int(current_day)-1])
             file = open("halloween/stories_telled.txt", "w")
             file.write(current_day)
