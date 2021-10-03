@@ -23,7 +23,7 @@ class HalloweenCog(commands.Cog):
             "alguien-te-observa","ese-refrigerador-estaba-lleno-de-gusanos","la-espantosa-historia-del-rey-devandra-gandagee",
             "chicas-no-humanas"
         ]
-        self.tz = timezone("US/Central")
+        self.tz = timezone("America/Costa_Rica")
         self.icon_footer = "https://cdn.icon-icons.com/icons2/147/PNG/256/pumpkin_evil_halloween_21550.png"
         self.base_url = "https://es.creepypasta.xyz/{}/"
         self.final_date = datetime.strptime('31/10/2021', "%d/%m/%Y").date()
