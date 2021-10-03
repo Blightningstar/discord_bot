@@ -97,12 +97,12 @@ class HalloweenCog(commands.Cog):
         return story
 
     async def arm_story(self, story_info, context):
-        current = 0 # Current embed being displayed
         self.embeds_queue = [] # We reset the embed queue if multiple calls of queue command are done.
+        current = 0
     
         queue_display_msg = ""  # Message added to field of embed object.
-        characters_added = 0
         embed_message = ""
+        characters_added = 0
 
         title = story_info["title"]
         story = story_info["body"]
@@ -141,55 +141,11 @@ class HalloweenCog(commands.Cog):
                             embed_message = ""
 
 
-
-        if len(self.embeds_queue) == 1:
-            embeded_queue_item = self.embeds_queue[current]
-            embeded_queue_item.set_footer(text=f"Página 1/1", icon_url=self.icon_footer)
-            msg = await context.send(embed=embeded_queue_item)
-            
-        elif len(self.embeds_queue) > 1:
-            buttons = [u"\u23EA", u"\u2B05", u"\u27A1", u"\u23E9"] # Skip to start, left, right, skip to end buttons.
-            # We only need the pagination functionality if there are multiple embed queue pages.
-
-            embeded_queue_item = self.embeds_queue[current]
+        for embed in self.embeds_queue:
+            embeded_queue_item = embed
             embeded_queue_item.set_footer(text=f"Página {current+1}/{len(self.embeds_queue)}", icon_url=self.icon_footer)
-
-            msg = await context.send(embed=self.embeds_queue[current])
-            for button in buttons:
-                await msg.add_reaction(button)
-
-            while True:
-                try:
-                    reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: user == context.author and reaction.emoji in buttons, timeout=86400.0)
-
-                except asyncio.TimeoutError:
-                    await msg.delete()
-                    return print("QUEUE EMBED NATURAL TIMEOUT")
-
-                else:
-                    previous_page = current
-                    if reaction.emoji == u"\u23EA": # Skip to Start
-                        current = 0
-                        
-                    elif reaction.emoji == u"\u2B05": # Previous queue page
-                        if current > 0:
-                            current -= 1
-                            
-                    elif reaction.emoji == u"\u27A1": # Next queue page
-                        if current < len(self.embeds_queue)-1:
-                            current += 1
-
-                    elif reaction.emoji == u"\u23E9": # Last queue page
-                        current = len(self.embeds_queue)-1
-
-                    for button in buttons:
-                        await msg.remove_reaction(button, context.author)
-
-                    if current != previous_page:
-                        embeded_queue_item = self.embeds_queue[current]
-                    
-                        embeded_queue_item.set_footer(text=f"Página {current+1}/{len(self.embeds_queue)}", icon_url=self.icon_footer)
-                        await msg.edit(embed=embeded_queue_item)
+            current += 1
+            msg = await context.send(embed=embeded_queue_item)
 
 
     ################################################################### COMMANDS METHODS #########################################################
