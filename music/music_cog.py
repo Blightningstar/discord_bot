@@ -66,8 +66,13 @@ class MusicCog(commands.Cog):
         Returns:
             * If the command is valid
         """
-        if context.message.channel.name != "music":
-            await context.send("Solo se puede usar la funcionalidad de musica en el canal de 'music'.")
+        if os.getenv("TEST_MODE") == "True":
+            accepted_channel = "marbot-test"
+        elif os.getenv("TEST_MODE") == "False":
+            accepted_channel = "music"
+
+        if context.message.channel.name != accepted_channel:
+            await context.send(f"Solo se puede usar la funcionalidad de música en el canal de '{accepted_channel}'.")
             return False
         elif context.author.voice is None:
             await context.send("Mae mamaste! No estás en un canal de voz")
@@ -147,7 +152,7 @@ class MusicCog(commands.Cog):
         Returns:
             * All the required info of the youtube url.
         """
-        if os.getenv("TEST_MODE") == True:
+        if os.getenv("TEST_MODE") == "True":
             self.YDL_OPTIONS["cookiefile"] = COOKIE_FILE
 
         with YoutubeDL(self.YDL_OPTIONS) as ydl:
@@ -176,7 +181,7 @@ class MusicCog(commands.Cog):
             * relevant_data: The array with necessary info of the song along with the 
                             voice channel the audio will play.
         """
-        if os.getenv("TEST_MODE") == True:
+        if os.getenv("TEST_MODE") == "True":
             self.YDL_OPTIONS_PLAYLIST["cookiefile"] = COOKIE_FILE
         
         item = 0
