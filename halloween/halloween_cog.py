@@ -1,9 +1,9 @@
 import discord
 import asyncio
+import os
 from urllib.request import Request, urlopen
-from typing_extensions import final
 from discord.ext import commands
-from datetime import date, datetime
+from datetime import datetime
 from pytz import timezone
 from bs4 import BeautifulSoup
 from discord.ext import commands
@@ -40,9 +40,13 @@ class HalloweenCog(commands.Cog):
         Returns:
             * If the command is valid
         """
-        accepted_channel = "creepy-privado" #"creepy-pastas"
+        if os.getenv("TEST_MODE") == "True":
+            accepted_channel = "creepy-privado"
+        elif os.getenv("TEST_MODE") == "False":
+            accepted_channel = "halloween"
+            
         if context.message.channel.name != accepted_channel:
-            await context.send(f"Solo se puede usar esta funcionalidad de Halloween en el canal de '{accepted_channel}'.")
+            await context.send(f"Solo se puede usar esta funcionalidad para Halloween en el canal de '{accepted_channel}'.")
             return False
         
         file = open("halloween/stories_telled.txt", "r")
@@ -197,7 +201,7 @@ class HalloweenCog(commands.Cog):
         current_day = datetime.now(self.tz).strftime('%-d')
         if start_date <= self.final_date:
             remainding_days = str(31-int(current_day))
-            
+
             if start_date < self.final_date:
                 await context.send(f"Boo! Feliz {current_day} de Octubre! Faltan {remainding_days} días para Halloween! 🎃")
             elif start_date == self.final_date:
