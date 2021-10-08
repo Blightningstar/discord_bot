@@ -84,7 +84,7 @@ class HalloweenCog(commands.Cog):
         html = urlopen(request).read()
 
         soup = BeautifulSoup(html,'html.parser')
-        p_all = soup.find_all("p")
+        p_all = soup.find(class_="entry-content").find_all('p')
         h1_all = soup.find_all("h1")
 
         story["title"] = h1_all[0].text
