@@ -24,3 +24,6 @@ RESUME_COMMAND_ALIASES = ["siga","continue", "re"]
 
 ############################### Move Command
 MOVE_COMMAND_ALIASES = ["mueva","m", "coleme"]
+
+############################### Help Command
+HELP_COMMAND_ALIASES = ["h", "commands", "ayuda", "comandos", "info", "aiuda", "alias"]
