@@ -5,7 +5,7 @@ import numpy as np
 import json, requests
 from discord.ext import commands
 from youtube_dl import YoutubeDL
-from settings import BOT_NAME, COOKIE_FILE
+from discord_bot.settings import BOT_NAME
 from .music_commands import (
     PLAY_COMMAND_ALIASES, QUEUE_COMMAND_ALIASES, 
     SKIP_COMMAND_ALIASES, SHUFFLE_COMMAND_ALIASES, 
@@ -178,7 +178,7 @@ class MusicCog(commands.Cog):
             * All the required info of the youtube url.
         """
         if os.getenv("TEST_MODE") == "True":
-            self.YDL_OPTIONS["cookiefile"] = COOKIE_FILE
+            self.YDL_OPTIONS["cookiefile"] = os.getenv('COOKIE_FILE', "")
 
         with YoutubeDL(self.YDL_OPTIONS) as ydl:
             try:
@@ -207,7 +207,7 @@ class MusicCog(commands.Cog):
                             voice channel the audio will play.
         """
         if os.getenv("TEST_MODE") == "True":
-            self.YDL_OPTIONS_PLAYLIST["cookiefile"] = COOKIE_FILE
+            self.YDL_OPTIONS_PLAYLIST["cookiefile"] = os.getenv('COOKIE_FILE', "")
         
         item = 0
         relevant_data = []

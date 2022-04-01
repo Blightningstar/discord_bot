@@ -1,6 +1,6 @@
 from discord.ext import commands
 import os
-import settings
+from discord_bot.settings import BOT_NAME
 
 from music_bot.music_cog import MusicCog
 from halloween_bot.halloween_cog import HalloweenCog
@@ -11,6 +11,6 @@ bot.add_cog(HalloweenCog(bot))
 
 @bot.event
 async def on_ready():
-    print(os.getenv("BOT_NAME", settings.BOT_NAME) + " ha despertado!")
+    print(os.getenv("BOT_NAME", BOT_NAME) + " ha despertado!")
 
 bot.run(os.getenv("TOKEN"))
