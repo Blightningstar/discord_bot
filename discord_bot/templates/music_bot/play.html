@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %} Music Bot Commands {% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="col">
+        <h1 class="mt-4">Play</h1>
+        <p></p>
+        <p>Busca por nombre o link de youtube un video y ponlo en la cola</p>
+        <p> 
+            Estos son los distintos comandos que pueden utilizar:
+            {% for command in play_aliases %}
+                <li><b>{{ command }}</b> nombre de la canción o url de la canción</li>
+            {% endfor %}
+            <li><b>play</b> nombre de la canción o url de la canción</li>
+        </p>
+        <table class="table">
+            <thead class="thead-dark">
+              <tr>
+                <th scope="col">Comando</th>
+                <th scope="col">Ejemplo</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">1</th>
+                <td>Mark</td>
+                <td>Otto</td>
+                <td>@mdo</td>
+              </tr>
+              <tr>
+                <th scope="row">2</th>
+                <td>Jacob</td>
+                <td>Thornton</td>
+                <td>@fat</td>
+              </tr>
+              <tr>
+                <th scope="row">3</th>
+                <td>Larry</td>
+                <td>the Bird</td>
+                <td>@twitter</td>
+              </tr>
+            </tbody>
+          </table>
+          
+          <table class="table">
+            <thead class="thead-light">
+              <tr>
+                <th scope="col">#</th>
+                <th scope="col">First</th>
+                <th scope="col">Last</th>
+                <th scope="col">Handle</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">1</th>
+                <td>Mark</td>
+                <td>Otto</td>
+                <td>@mdo</td>
+              </tr>
+              <tr>
+                <th scope="row">2</th>
+                <td>Jacob</td>
+                <td>Thornton</td>
+                <td>@fat</td>
+              </tr>
+              <tr>
+                <th scope="row">3</th>
+                <td>Larry</td>
+                <td>the Bird</td>
+                <td>@twitter</td>
+              </tr>
+            </tbody>
+          </table>
+    </div>
+</div>
+{% endblock %}
