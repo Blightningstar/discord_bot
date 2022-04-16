@@ -3,18 +3,77 @@
 {% block title %} Music Bot Commands {% endblock %}
 
 {% block content %}
-<div class="col">
-    <h1 class="display-3 text-center">Play</h1>
-</div>
 <div class="container-fluid">
-    <h1 class="mt-4">Simple Sidebar</h1>
-    <p>The starting state of the menu will appear collapsed on smaller screens, and will appear non-collapsed on larger screens. When toggled using the button below, the menu will change.</p>
-    <p>
-        Make sure to keep all page content within the
-        <code>#page-content-wrapper</code>
-        . The top navbar is optional, and just for demonstration. Just create an element with the
-        <code>#sidebarToggle</code>
-        ID which will toggle the menu when clicked.
-    </p>
+    <div class="col">
+        <h1 class="mt-4">Play</h1>
+        <p></p>
+        <p>Busca por nombre o link de youtube un video y ponlo en la cola</p>
+        <p> 
+            Estos son los distintos comandos que pueden utilizar:
+            {% for command in play_aliases %}
+                <li><b>{{ command }}</b> nombre de la canción o url de la canción</li>
+            {% endfor %}
+            <li><b>play</b> nombre de la canción o url de la canción</li>
+        </p>
+        <table class="table">
+            <thead class="thead-dark">
+              <tr>
+                <th scope="col">Comando</th>
+                <th scope="col">Ejemplo</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">1</th>
+                <td>Mark</td>
+                <td>Otto</td>
+                <td>@mdo</td>
+              </tr>
+              <tr>
+                <th scope="row">2</th>
+                <td>Jacob</td>
+                <td>Thornton</td>
+                <td>@fat</td>
+              </tr>
+              <tr>
+                <th scope="row">3</th>
+                <td>Larry</td>
+                <td>the Bird</td>
+                <td>@twitter</td>
+              </tr>
+            </tbody>
+          </table>
+          
+          <table class="table">
+            <thead class="thead-light">
+              <tr>
+                <th scope="col">#</th>
+                <th scope="col">First</th>
+                <th scope="col">Last</th>
+                <th scope="col">Handle</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">1</th>
+                <td>Mark</td>
+                <td>Otto</td>
+                <td>@mdo</td>
+              </tr>
+              <tr>
+                <th scope="row">2</th>
+                <td>Jacob</td>
+                <td>Thornton</td>
+                <td>@fat</td>
+              </tr>
+              <tr>
+                <th scope="row">3</th>
+                <td>Larry</td>
+                <td>the Bird</td>
+                <td>@twitter</td>
+              </tr>
+            </tbody>
+          </table>
+    </div>
 </div>
 {% endblock %}

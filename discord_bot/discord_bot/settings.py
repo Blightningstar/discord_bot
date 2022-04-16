@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-wjnt-2k5dh(la6zotx-8v)3ggmg3y=_tkn6pg3bt*7ygytxtfy
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["localhost","0.0.0.0",".ngrok.io"]
 
 BOT_NAME = "Marbot"
 

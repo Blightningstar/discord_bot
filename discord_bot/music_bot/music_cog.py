@@ -28,30 +28,6 @@ class MusicCog(commands.Cog):
         self.entries_of_playlist = 0 # This is to keep track of the amount of songs in a playlist
         self.processing_playlist = False # This keeps track if a playlist is being processed by the search_youtube_playlist method
 
-        # self.all_commands = {
-        #     "play": "Search for a youtube video for its name or link and added queue it", 
-        #     "now_playing": "Shows the info of the song currently playing", 
-        #     "move": "Move a song from position X to position Y in the queue or just move from position X to 1", 
-        #     "queue": "Displays the songs currently in queue", 
-        #     "join": "Joins the bot to your voice channel", 
-        #     "skip": "Skips the current song playing", 
-        #     "pause": "Pauses the current song playing",
-        #     "resume": "Resumes the current song playing",
-        #     "shuffle": "Shuffles the queue",
-        #     "help": "Information of each command"
-        # }
-        self.all_commands = {
-            "play": "Busca por nombre o link de youtube un video y ponlo en la cola", 
-            "now_playing": "Muestra la info de la canción que suena", 
-            "move": "Mueve una canción de la posición X a la Y o al poner solo la posición de la canción la pone de primera", 
-            "queue": "Muestra la cola de canciones", 
-            "join": "Mete al bot tu canal de voz", 
-            "skip": "Quita la canción actual", 
-            "pause": "Pausa la canción",
-            "resume": "Reanuda la canción",
-            "shuffle": "Shuffle la lista de canciones",
-            "help": "Info de los distintos comandos"
-        }
         self.FFMPEG_OPTIONS = {
             "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
             "options": "-vn"
@@ -670,19 +646,11 @@ class MusicCog(commands.Cog):
         if context.message.channel.name != accepted_channel:
             await context.send(f"Solo se puede usar la funcionalidad de música en el canal de '{accepted_channel}'.")
         else:
-            commands_aliases = ""
-            for command in ["play", "now_playing", "move", "queue", 
-            "join", "skip", "pause", "shuffle", "resume", "help_alias"]:
-                commands_aliases += f"{command}: {commands.Bot.get_command(self.bot, command).aliases}\n"
-            
-            for character in ["[","]","'"]:
-                commands_aliases = commands_aliases.replace(character,"")
-
             await context.send(
                 embed=discord.Embed(
-                    title= "Lista de Comandos del bot de música 🍆", 
-                    color=discord.Color.blurple())
-                    .add_field(name="Alias de cada comando", value=commands_aliases, inline=False)
+                    title= "Documentación de Comandos del bot de música 🍆", 
+                    color=discord.Color.blurple(),
+                    url="http://localhost:8000/marbotest/commands_help/")
                     , delete_after=60.0
             )
 
