@@ -7,7 +7,7 @@
     <div class="col">
         <h1 class="mt-4">Play</h1>
         <hr>
-        <p>Busca por nombre o link de youtube un video y ponlo en la cola</p>
+        <p>Busca por nombre o link de youtube un video y ponlo en la cola de reproducción.</p>
 
         <div class="alert alert-info">
             <h5><b>Notas:</b></h5>
@@ -20,10 +20,12 @@
         </div>
         <p> 
             Estos son los distintos comandos que pueden utilizar:
-            {% for command in play_aliases %}
-                <li><b>{{ command }}</b></li>
-            {% endfor %}
-            <li><b>play</b></li>
+            <ul>
+                {% for command in command_aliases %}
+                    <li><b>{{ command }}</b></li>
+                {% endfor %}
+                <li><b>{{ base_command }}</b></li>
+            </ul>
         </p>
         <table class="table table-bordered">
             <thead class="thead-dark">
@@ -33,7 +35,7 @@
               </tr>
             </thead>
             <tbody>
-                {% for command in play_aliases %}
+                {% for command in command_aliases %}
                 <tr>
                     <td>
                         <b>{{ command }}</b> nombre de la canción o url de la canción
@@ -42,19 +44,17 @@
                         {{ command }} macarena
                         <hr>
                         {{ command }} https://www.youtube.com/watch?v=zWaymcVmJ-A
-                        </td>
                     </td>
                 </tr>
                 {% endfor %}
                 <tr>
                     <td>
-                        <b>play</b> nombre de la canción o url de la canción
+                        <b>{{ base_command }}</b> nombre de la canción o url de la canción
                     </td>
                     <td>
-                        play macarena
+                        {{ base_command }} macarena
                         <hr>
-                        play https://www.youtube.com/watch?v=zWaymcVmJ-A
-                        </td>
+                        {{ base_command }} https://www.youtube.com/watch?v=zWaymcVmJ-A
                     </td>
                 </tr>
             </tbody>
