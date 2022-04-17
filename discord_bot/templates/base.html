@@ -12,9 +12,9 @@
 </head>
 
 <body>
-    <div class="d-flex" id="wrapper">
+    <div class="d-flex wrapper" id="wrapper">
         <div class=".row">
-            <div class="sidebar d-flex flex-column flex-shrink-0 p-3" style="width: 350px;">
+            <div class="sidebar sidebar-header d-flex flex-column flex-shrink-0 p-3" id="sidebar" style="width: 350px;">
                 <a href="{% url 'commands-help' %}" class="list-group-item list-group-item-action py-3 lh-tight">
                     <div class="d-flex w-100 align-items-center justify-content-between">
                     <strong class="mb-1">Marbot Commands</strong>
@@ -77,14 +77,14 @@
                 </a>
             </div>
         </div>
+        <div id="content">
+            <button id="sidebarCollapse" class="navbar-btn" type="button">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </header>
         <div class=".row">
-            <header>
-                <button id="sidebarCollapse" class="navbar-btn active" type="button">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                </button>
-            </header>
             {% block content %}
             {% endblock %}
         </div>
