@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% load static%}
+
+{% block title %} Music Bot Commands {% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="col">
+        <h1 class="mt-4">Move</h1>
+        <hr>
+        <p>
+            Permite mover una canción de su posición actual en la cola a la posición deseada o moverla directamente a la primera posición.
+        </p>
+        <div class="alert alert-info">
+            <h5><b>Notas:</b></h5>
+            <p>
+                Para mover una canción de la posición 13 a la posición 2: move 13 2
+                <br>
+                Para mover una canción de la posición 13 a la primera posición: move 13
+            </p>
+        </div>
+        <p> 
+            Estos son los distintos comandos que pueden utilizar:
+            <ul>
+                {% for command in command_aliases %}
+                    <li><b>{{ command }}</b></li>
+                {% endfor %}
+                <li><b>{{ base_command }}</b></li>
+            </ul>
+        </p>
+        <table class="table table-bordered">
+            <thead class="thead-dark">
+              <tr>
+                <th scope="col">Comandos</th>
+                <th scope="col">Ejemplos</th>
+              </tr>
+            </thead>
+            <tbody>
+                {% for command in command_aliases %}
+                <tr>
+                    <td>
+                        <b>{{ command }}</b> X Y o solo X
+                    </td>
+                    <td>
+                        {{ command }} 13 2
+                        <hr>
+                        {{ command }} 13
+                    </td>
+                </tr>
+                {% endfor %}
+                <tr>
+                    <td>
+                        <b>{{ base_command }}</b> X Y o solo X
+                    </td>
+                    <td>
+                        {{ base_command }} 13 2
+                        <hr>
+                        {{ base_command }} 13
+                    </td>
+                </tr>
+            </tbody>
+          </table>
+    </div>
+</div>
+{% endblock %}
