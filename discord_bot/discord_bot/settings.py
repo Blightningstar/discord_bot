@@ -24,9 +24,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-wjnt-2k5dh(la6zotx-8v)3ggmg3y=_tkn6pg3bt*7ygytxtfy'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv("TEST_MODE")
 
-ALLOWED_HOSTS = ["localhost","0.0.0.0",".ngrok.io"]
+ALLOWED_HOSTS = ["localhost","0.0.0.0",".ngrok.io", ".herokuapp.com"]
 
 BOT_NAME = "Marbot"
 
