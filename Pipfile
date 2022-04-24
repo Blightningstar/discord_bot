@@ -12,6 +12,7 @@ requests = "*"
 datetime = "*"
 schedule = "*"
 bs4 = "*"
+Django = "*"
 
 [dev-packages]
 
