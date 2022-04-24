@@ -7,6 +7,11 @@ name = "pypi"
 youtube-dl = "*"
 discord = "*"
 PyNaCl = "*"
+numpy = "*"
+requests = "*"
+datetime = "*"
+schedule = "*"
+bs4 = "*"
 
 [dev-packages]
 
