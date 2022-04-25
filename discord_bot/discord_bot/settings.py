@@ -74,11 +74,11 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'discord_bot.wsgi.application'
 
-if test_mode == True:
-    STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static'), ]
-else:
-    STATIC_ROOT = os.path.join(BASE_DIR, 'static')
-
+# if test_mode == True:
+#     STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static'), ]
+# else:
+#     STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
