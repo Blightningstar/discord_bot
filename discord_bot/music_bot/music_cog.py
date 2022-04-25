@@ -53,6 +53,7 @@ class MusicCog(commands.Cog):
             "ignoreerrors": True, # Do not stop on download errors.
         }
         self.vc = "" # Stores current channel
+        self.test_mode = bool(os.getenv("TEST_MODE"))
 
     ################################################################### UTIL METHODS #############################################################
 
@@ -67,9 +68,10 @@ class MusicCog(commands.Cog):
         Returns:
             * If the command is valid
         """
-        if os.getenv("TEST_MODE") == "True":
+        test_mode = bool(os.getenv("TEST_MODE"))
+        if test_mode == True:
             accepted_channel = "marbot-test"
-        elif os.getenv("TEST_MODE") == "False":
+        elif test_mode == False:
             accepted_channel = "music"
    
         if context.message.channel.name != accepted_channel:
@@ -153,7 +155,7 @@ class MusicCog(commands.Cog):
         Returns:
             * All the required info of the youtube url.
         """
-        if os.getenv("TEST_MODE") == "True":
+        if self.test_mode == True:
             self.YDL_OPTIONS["cookiefile"] = os.getenv('COOKIE_FILE', "")
 
         with YoutubeDL(self.YDL_OPTIONS) as ydl:
@@ -182,7 +184,7 @@ class MusicCog(commands.Cog):
             * relevant_data: The array with necessary info of the song along with the 
                             voice channel the audio will play.
         """
-        if os.getenv("TEST_MODE") == "True":
+        if self.test_mode == True:
             self.YDL_OPTIONS_PLAYLIST["cookiefile"] = os.getenv('COOKIE_FILE', "")
         
         item = 0
@@ -638,9 +640,9 @@ class MusicCog(commands.Cog):
 
     @commands.command(aliases=HELP_COMMAND_ALIASES)
     async def help_alias(self, context):
-        if os.getenv("TEST_MODE") == "True":
+        if self.test_mode == True:
             accepted_channel = "marbot-test"
-        elif os.getenv("TEST_MODE") == "False":
+        elif self.test_mode == False:
             accepted_channel = "music"
 
         if context.message.channel.name != accepted_channel:
