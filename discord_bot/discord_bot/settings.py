@@ -16,7 +16,6 @@ import os
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.0/howto/deployment/checklist/
 
@@ -24,7 +23,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-wjnt-2k5dh(la6zotx-8v)3ggmg3y=_tkn6pg3bt*7ygytxtfy'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("TEST_MODE")
+test_mode = bool(os.getenv("TEST_MODE"))
+DEBUG = test_mode
 
 ALLOWED_HOSTS = ["localhost","0.0.0.0",".ngrok.io", ".herokuapp.com"]
 
@@ -74,7 +74,11 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'discord_bot.wsgi.application'
 
-STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static'), ]
+if test_mode == True:
+    STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static'), ]
+else:
+    STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+
 
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
