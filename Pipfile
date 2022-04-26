@@ -16,6 +16,7 @@ requests = "*"
 schedule = "*"
 six = "*"
 youtube-dl = "*"
+gunicorn = "*"
 
 [dev-packages]
 
