@@ -1,0 +1,2 @@
+worker: python marmoBot.py
+web: gunicorn discord_bot.wsgi
