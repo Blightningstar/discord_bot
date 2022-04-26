@@ -4,15 +4,18 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-youtube-dl = "*"
-discord = "*"
-PyNaCl = "*"
-numpy = "*"
-requests = "*"
-datetime = "*"
-schedule = "*"
 bs4 = "*"
+DateTime = "*"
+discord = "*"
 Django = "*"
+django-heroku = "*"
+numpy = "*"
+psycopg2-binary = "*"
+PyNaCl = "*"
+requests = "*"
+schedule = "*"
+six = "*"
+youtube-dl = "*"
 
 [dev-packages]
 
