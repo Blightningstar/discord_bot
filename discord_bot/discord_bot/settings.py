@@ -20,7 +20,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-wjnt-2k5dh(la6zotx-8v)3ggmg3y=_tkn6pg3bt*7ygytxtfy'
+SECRET_KEY = os.getenv("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 test_mode = bool(os.getenv("TEST_MODE"))
@@ -74,11 +74,10 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'discord_bot.wsgi.application'
 
-# if test_mode == True:
-#     STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static'), ]
-# else:
-#     STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+if test_mode == True:
+    del(STATIC_ROOT)
+    STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static'), ]
 
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
