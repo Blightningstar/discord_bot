@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'whitenoise.runserver_nostatic',
     'django.contrib.staticfiles',
     'music_bot',
     'halloween_bot'
@@ -45,6 +46,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware'
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -74,10 +76,9 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'discord_bot.wsgi.application'
 
-STATIC_ROOT = os.path.join(BASE_DIR, 'static')
-if test_mode == True:
-    del(STATIC_ROOT)
-    STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static'), ]
+WHITENOISE_USE_FINDERS = True
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static'), ]
 
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
