@@ -24,7 +24,7 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 test_mode = bool(os.getenv("TEST_MODE"))
-DEBUG = test_mode
+DEBUG = test_mode if test_mode else False
 
 ALLOWED_HOSTS = ["localhost","0.0.0.0",".ngrok.io", ".herokuapp.com"]
 
