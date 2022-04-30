@@ -15,7 +15,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from discord_bot.settings import BOT_NAME
+from discord_bot.settings.base import BOT_NAME
 import os
 url_bot_name = str(os.getenv("BOT_NAME", BOT_NAME)).lower()
 urlpatterns = [

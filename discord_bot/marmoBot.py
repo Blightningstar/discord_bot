@@ -1,6 +1,6 @@
 from discord.ext import commands
 import os
-from discord_bot.settings import BOT_NAME
+from discord_bot.settings.base import BOT_NAME
 
 from music_bot.music_cog import MusicCog
 from halloween_bot.halloween_cog import HalloweenCog

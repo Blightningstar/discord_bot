@@ -5,7 +5,7 @@ import numpy as np
 import json, requests
 from discord.ext import commands
 from youtube_dl import YoutubeDL
-from discord_bot.settings import BOT_NAME
+from discord_bot.settings.base import BOT_NAME
 from .music_commands import (
     PLAY_COMMAND_ALIASES, QUEUE_COMMAND_ALIASES, 
     SKIP_COMMAND_ALIASES, SHUFFLE_COMMAND_ALIASES, 
