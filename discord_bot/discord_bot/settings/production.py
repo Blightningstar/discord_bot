@@ -1,6 +1,7 @@
 from .base import *
 
-DEBUG = False
+test_mode = os.getenv("TEST_MODE")
+DEBUG = test_mode if test_mode else False
 
 ALLOWED_HOSTS = [".herokuapp.com"]
 

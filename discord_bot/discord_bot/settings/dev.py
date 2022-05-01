@@ -1,6 +1,7 @@
 from .base import *
 
-DEBUG = True
+test_mode = os.getenv("TEST_MODE")
+DEBUG = test_mode if test_mode else False
 
 ALLOWED_HOSTS = ["localhost","0.0.0.0",".ngrok.io"]
 
