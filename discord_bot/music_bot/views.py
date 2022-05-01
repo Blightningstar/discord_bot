@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from .music_commands import PLAY_COMMAND_ALIASES, NOW_PLAYING_COMMAND_ALIASES, MOVE_COMMAND_ALIASES
+from .music_commands import PLAY_COMMAND_ALIASES, NOW_PLAYING_COMMAND_ALIASES, MOVE_COMMAND_ALIASES, QUEUE_COMMAND_ALIASES
 
 def music_commands_views(request):
     return render(request, "music_bot/music_commands_help.html")
@@ -15,3 +15,7 @@ def now_playing_view(request):
 def move_view(request):
     context = {"command_aliases": MOVE_COMMAND_ALIASES, "base_command":"move"}
     return render(request, "music_bot/move.html", context=context)
+
+def queue_view(request):
+    context = {"command_aliases": QUEUE_COMMAND_ALIASES, "base_command":"queue"}
+    return render(request, "music_bot/queue.html", context=context)
