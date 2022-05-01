@@ -13,12 +13,15 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+import os
 from django.contrib import admin
 from django.urls import path, include
 from discord_bot.settings.base import BOT_NAME
-import os
+from .views import home
+
 url_bot_name = str(os.getenv("BOT_NAME", BOT_NAME)).lower()
 urlpatterns = [
+    path("", home, name="home"),
     path('admin/', admin.site.urls),
-    path(f'{url_bot_name}/', include('music_bot.urls'))
+    path(f'{url_bot_name}/', include('music_bot.urls')),
 ]
