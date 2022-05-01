@@ -9,15 +9,30 @@
         <h1 class="mt-4">Queue</h1>
         <hr>
         <p>
-            Si una canción actualmente está sonando en el Marbot, al usar este comando verás por un minuto más información sobre la canción,
-            <br> mostrando así:
+            Si una canción actualmente está sonando en el Marbot y una o más canciones fueron agregadas para ser reproducidas, 
+            estas entran en la cola de canciones.
+            <br> Este comando permite mostrar todas las canciones organizadas en varias páginas dependiendo de la 
+            cantidad de canciones en cola por un minuto. 
+            <br>
+            <br> Esta es la información que brinda:
             <ul>
-                <li>El nombre y link del video en youtube por si lo quieren salvar para sus listas</li>
-                <li>La duración de la canción</li>
-                <li>El nombre del usuario que añadió dicha canción</li>
+                <li>La posición de cada canción</li>
+                <li>La duración de cada canción en la cola</li>
+                <li>Qué usuario agregó que canción a la cola</li>
+                <li>La cantidad de canciones actualmente en la cola</li>
+                <li>La duración completa de la cola</li>
+                <li>La cantidad de páginas para mostrar la totalidad de la cola</li>
             </ul>
         </p>
-        <img src="{% static 'assets/now_playing.png' %}" alt="now_playing image">
+        <img src="{% static 'assets/queue.png' %}" alt="queue image">
+        <p>
+            Si hay muchas canciones canciones en la cola, la cola tendrá unos emojis que servirán de botones para navegar por la lista, como se muestra a continuación:
+        </p>
+        <img src="{% static 'assets/big_queue.png' %}" alt="big queue image">
+        <p>
+            Por otro lado, si no hay canciones en la cola:
+        </p>
+        <img src="{% static 'assets/empty_queue.png' %}" alt="empty queue image">
         <p> 
             Estos son los distintos comandos que pueden utilizar:
             <ul>
