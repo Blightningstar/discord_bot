@@ -2,7 +2,7 @@ from django.shortcuts import render
 from .music_commands import (
     PLAY_COMMAND_ALIASES, NOW_PLAYING_COMMAND_ALIASES, 
     MOVE_COMMAND_ALIASES, QUEUE_COMMAND_ALIASES, 
-    JOIN_COMMAND_ALIASES
+    JOIN_COMMAND_ALIASES, SKIP_COMMAND_ALIASES
 )
 
 def music_commands_views(request):
@@ -27,3 +27,7 @@ def queue_view(request):
 def join_view(request):
     context = {"command_aliases": JOIN_COMMAND_ALIASES, "base_command":"join"}
     return render(request, "music_bot/join.html", context=context)
+
+def skip_view(request):
+    context = {"command_aliases": SKIP_COMMAND_ALIASES, "base_command":"skip"}
+    return render(request, "music_bot/skip.html", context=context)
