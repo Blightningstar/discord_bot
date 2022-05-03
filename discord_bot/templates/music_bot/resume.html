@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% load static%}
+
+{% block title %} Music Bot Commands {% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="col">
+        <h1 class="mt-4">Resume</h1>
+        <hr>
+        <p>
+            Si una canción actualmente está pausada en el Marbot, 
+            al usar este comando la canción volverá a sonar y mostrará un mensaje indicando que la canción continuará sonando
+        </p>
+        <img src="{% static 'assets/resume.png' %}" alt="now_playing image">
+        <p> 
+            Estos son los distintos comandos que pueden utilizar:
+            <ul>
+                {% for command in command_aliases %}
+                    <li><b>{{ command }}</b></li>
+                {% endfor %}
+                <li><b>{{ base_command }}</b></li>
+            </ul>
+        </p>
+        <table class="table table-bordered">
+            <thead class="thead-dark">
+              <tr>
+                <th scope="col">Comandos</th>
+                <th scope="col">Ejemplos</th>
+              </tr>
+            </thead>
+            <tbody>
+                {% for command in command_aliases %}
+                <tr>
+                    <td>
+                        <b>{{ command }}</b>
+                    </td>
+                    <td>
+                        {{ command }}
+                    </td>
+                </tr>
+                {% endfor %}
+                <tr>
+                    <td>
+                        <b>{{ base_command }}</b>
+                    </td>
+                    <td>
+                        {{ base_command }}
+                    </td>
+                </tr>
+            </tbody>
+          </table>
+    </div>
+</div>
+{% endblock %}

@@ -3,7 +3,7 @@ from .music_commands import (
     PLAY_COMMAND_ALIASES, NOW_PLAYING_COMMAND_ALIASES, 
     MOVE_COMMAND_ALIASES, QUEUE_COMMAND_ALIASES, 
     JOIN_COMMAND_ALIASES, SKIP_COMMAND_ALIASES,
-    PAUSE_COMMAND_ALIASES
+    PAUSE_COMMAND_ALIASES, RESUME_COMMAND_ALIASES
 )
 
 def music_commands_views(request):
@@ -36,3 +36,7 @@ def skip_view(request):
 def pause_view(request):
     context = {"command_aliases": PAUSE_COMMAND_ALIASES, "base_command":"pause"}
     return render(request, "music_bot/pause.html", context=context)
+
+def resume_view(request):
+    context = {"command_aliases": RESUME_COMMAND_ALIASES, "base_command":"resume"}
+    return render(request, "music_bot/resume.html", context=context)
