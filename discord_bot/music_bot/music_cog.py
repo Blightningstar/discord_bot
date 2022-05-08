@@ -11,7 +11,8 @@ from .music_commands import (
     SKIP_COMMAND_ALIASES, SHUFFLE_COMMAND_ALIASES, 
     NOW_PLAYING_COMMAND_ALIASES, JOIN_COMMAND_ALIASES,
     PAUSE_COMMAND_ALIASES, RESUME_COMMAND_ALIASES,
-    MOVE_COMMAND_ALIASES, HELP_COMMAND_ALIASES)
+    MOVE_COMMAND_ALIASES, HELP_COMMAND_ALIASES
+)
 
 class MusicCog(commands.Cog):
     def __init__(self, bot):
@@ -54,6 +55,14 @@ class MusicCog(commands.Cog):
         }
         self.vc = "" # Stores current channel
         self.test_mode = bool(os.getenv("TEST_MODE"))
+
+        self.help_commands_url = ""
+        if os.getenv("DEPLOYED_ON") == "local":
+            self.help_commands_url = "http://localhost:8080/marbotest/commands_help/"
+        elif os.getenv("DEPLOYED_ON") == "heroku-1":
+            self.help_commands_url = "https://discord-marbot.herokuapp.com/marbot/commands_help/"
+        elif os.getenv("DEPLOYED_ON") == "heroku-2":
+            self.help_commands_url = "https://discord-marbot-2.herokuapp.com/marbot/commands_help/"
 
     ################################################################### UTIL METHODS #############################################################
 
@@ -650,9 +659,9 @@ class MusicCog(commands.Cog):
         else:
             await context.send(
                 embed=discord.Embed(
-                    title= "Documentación de Comandos del bot de música 🍆", 
+                    title= "Click aquí para ver la documentación de Comandos del bot de música 🍆", 
                     color=discord.Color.blurple(),
-                    url="http://localhost:8000/marbotest/commands_help/")
+                    url=self.help_commands_url)
                     , delete_after=60.0
             )
 
