@@ -73,10 +73,13 @@ TEMPLATES = [
     },
 ]
 
+STATIC_URL = '/static/' 
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+
 WSGI_APPLICATION = 'discord_bot.wsgi.application'
 
 WHITENOISE_USE_FINDERS = True
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
@@ -106,9 +109,6 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
-
-STATIC_URL = '/static/' 
-STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 
 # Internationalization
 # https://docs.djangoproject.com/en/4.0/topics/i18n/
