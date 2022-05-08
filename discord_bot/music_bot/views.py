@@ -4,11 +4,12 @@ from .music_commands import (
     MOVE_COMMAND_ALIASES, QUEUE_COMMAND_ALIASES, 
     JOIN_COMMAND_ALIASES, SKIP_COMMAND_ALIASES,
     PAUSE_COMMAND_ALIASES, RESUME_COMMAND_ALIASES,
-    SHUFFLE_COMMAND_ALIASES
+    SHUFFLE_COMMAND_ALIASES, HELP_COMMAND_ALIASES
 )
 
 def music_commands_views(request):
-    return render(request, "music_bot/music_commands_help.html")
+    context = {"command_aliases": HELP_COMMAND_ALIASES, "base_command":"help_alias"}
+    return render(request, "music_bot/music_commands_help.html", context=context)
 
 def play_view(request):
     context = {"command_aliases": PLAY_COMMAND_ALIASES, "base_command":"play"}

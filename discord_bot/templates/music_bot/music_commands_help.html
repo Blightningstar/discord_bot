@@ -17,6 +17,37 @@
         </p>
         <p>Atentamente,<br> Marmo</p>
         <img src="http://vignette2.wikia.nocookie.net/memes-pedia/images/7/73/Dramatic_Chipmunk.gif/revision/latest/scale-to-width-down/300?cb=20160228031751&path-prefix=es" alt="Marmo">
+        <p>
+            De paso, estos son las otras formas de usar el comando de ayuda, por si prefieren memorizar alguno de estos otros:
+        </p>
+        <table class="table table-bordered">
+            <thead class="thead-dark">
+              <tr>
+                <th scope="col">Comandos</th>
+                <th scope="col">Ejemplos</th>
+              </tr>
+            </thead>
+            <tbody>
+                {% for command in command_aliases %}
+                <tr>
+                    <td>
+                        <b>{{ command }}</b>
+                    </td>
+                    <td>
+                        {{ command }}
+                    </td>
+                </tr>
+                {% endfor %}
+                <tr>
+                    <td>
+                        <b>{{ base_command }}</b>
+                    </td>
+                    <td>
+                        {{ base_command }}
+                    </td>
+                </tr>
+            </tbody>
+          </table>
     </div>
 </div>
 {% endblock %}
