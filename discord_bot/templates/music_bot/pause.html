@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% load static%}
+
+{% block title %} Music Bot Commands {% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="col">
+        <h1 class="mt-4">Pause</h1>
+        <hr>
+        <p>
+            Pausa la canción que actualmente esta tocando el marbot e indica con un mensaje que la canción fue pausada.
+        </p>
+        <img src="{% static 'assets/pause.png' %}" alt="pause image">
+        <p> 
+            Estos son los distintos comandos que pueden utilizar:
+            <ul>
+                {% for command in command_aliases %}
+                    <li><b>{{ command }}</b></li>
+                {% endfor %}
+                <li><b>{{ base_command }}</b></li>
+            </ul>
+        </p>
+        <table class="table table-bordered">
+            <thead class="thead-dark">
+              <tr>
+                <th scope="col">Comandos</th>
+                <th scope="col">Ejemplos</th>
+              </tr>
+            </thead>
+            <tbody>
+                {% for command in command_aliases %}
+                <tr>
+                    <td>
+                        <b>{{ command }}</b>
+                    </td>
+                    <td>
+                        {{ command }}
+                    </td>
+                </tr>
+                {% endfor %}
+                <tr>
+                    <td>
+                        <b>{{ base_command }}</b>
+                    </td>
+                    <td>
+                        {{ base_command }}
+                    </td>
+                </tr>
+            </tbody>
+          </table>
+    </div>
+</div>
+{% endblock %}
