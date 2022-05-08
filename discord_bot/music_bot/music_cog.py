@@ -54,7 +54,7 @@ class MusicCog(commands.Cog):
             "ignoreerrors": True, # Do not stop on download errors.
         }
         self.vc = "" # Stores current channel
-        self.test_mode = bool(os.getenv("TEST_MODE"))
+        self.test_mode = os.getenv("TEST_MODE")
 
         self.help_commands_url = ""
         if os.getenv("DEPLOYED_ON") == "local":
@@ -77,10 +77,10 @@ class MusicCog(commands.Cog):
         Returns:
             * If the command is valid
         """
-        test_mode = bool(os.getenv("TEST_MODE"))
-        if test_mode == True:
+        test_mode = os.getenv("TEST_MODE")
+        if test_mode == "True":
             accepted_channel = "marbot-test"
-        elif test_mode == False:
+        elif test_mode == "False":
             accepted_channel = "music"
    
         if context.message.channel.name != accepted_channel:
@@ -164,7 +164,7 @@ class MusicCog(commands.Cog):
         Returns:
             * All the required info of the youtube url.
         """
-        if self.test_mode == True:
+        if self.test_mode == "True":
             self.YDL_OPTIONS["cookiefile"] = os.getenv('COOKIE_FILE', "")
 
         with YoutubeDL(self.YDL_OPTIONS) as ydl:
@@ -193,7 +193,7 @@ class MusicCog(commands.Cog):
             * relevant_data: The array with necessary info of the song along with the 
                             voice channel the audio will play.
         """
-        if self.test_mode == True:
+        if self.test_mode == "True":
             self.YDL_OPTIONS_PLAYLIST["cookiefile"] = os.getenv('COOKIE_FILE', "")
         
         item = 0
@@ -649,9 +649,9 @@ class MusicCog(commands.Cog):
 
     @commands.command(aliases=HELP_COMMAND_ALIASES)
     async def help_alias(self, context):
-        if self.test_mode == True:
+        if self.test_mode == "True":
             accepted_channel = "marbot-test"
-        elif self.test_mode == False:
+        elif self.test_mode == "False":
             accepted_channel = "music"
 
         if context.message.channel.name != accepted_channel:
