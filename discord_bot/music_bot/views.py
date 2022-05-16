@@ -4,7 +4,8 @@ from .music_commands import (
     MOVE_COMMAND_ALIASES, QUEUE_COMMAND_ALIASES, 
     JOIN_COMMAND_ALIASES, SKIP_COMMAND_ALIASES,
     PAUSE_COMMAND_ALIASES, RESUME_COMMAND_ALIASES,
-    SHUFFLE_COMMAND_ALIASES, HELP_COMMAND_ALIASES
+    SHUFFLE_COMMAND_ALIASES, HELP_COMMAND_ALIASES,
+    DISCONNECT_COMMAND_ALIASES
 )
 
 def music_commands_views(request):
@@ -30,6 +31,10 @@ def queue_view(request):
 def join_view(request):
     context = {"command_aliases": JOIN_COMMAND_ALIASES, "base_command":"join"}
     return render(request, "music_bot/join.html", context=context)
+
+def disconnect_view(request):
+    context = {"command_aliases": DISCONNECT_COMMAND_ALIASES, "base_command":"disconnect"}
+    return render(request, "music_bot/disconnect.html", context=context)
 
 def skip_view(request):
     context = {"command_aliases": SKIP_COMMAND_ALIASES, "base_command":"skip"}
