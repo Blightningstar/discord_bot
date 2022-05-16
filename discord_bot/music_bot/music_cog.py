@@ -11,7 +11,8 @@ from .music_commands import (
     SKIP_COMMAND_ALIASES, SHUFFLE_COMMAND_ALIASES, 
     NOW_PLAYING_COMMAND_ALIASES, JOIN_COMMAND_ALIASES,
     PAUSE_COMMAND_ALIASES, RESUME_COMMAND_ALIASES,
-    MOVE_COMMAND_ALIASES, HELP_COMMAND_ALIASES
+    MOVE_COMMAND_ALIASES, HELP_COMMAND_ALIASES,
+    DISCONNECT_COMMAND_ALIASES
 )
 
 class MusicCog(commands.Cog):
@@ -53,7 +54,7 @@ class MusicCog(commands.Cog):
             }],
             "ignoreerrors": True, # Do not stop on download errors.
         }
-        self.vc = "" # Stores current channel
+        self.vc = None # Stores current channel
         self.test_mode = os.getenv("TEST_MODE")
 
         self.help_commands_url = ""
@@ -111,8 +112,12 @@ class MusicCog(commands.Cog):
                     return False
 
         command = (context.message.clean_content).split(" ")[0] # Get the command the user used.
-        # If command is not the play one it is an error. Since play connects the bot.
-        if self.vc == "" and command not in PLAY_COMMAND_ALIASES and command != "play":
+        # If the command is not the play or disconnect one it is an error. 
+        # Since play connects the bot and disconnects makes it leave a voice channel.
+        acepted_commands = ["play", "disconnect"]
+        acepted_commands += PLAY_COMMAND_ALIASES
+        acepted_commands += DISCONNECT_COMMAND_ALIASES
+        if self.vc and command not in acepted_commands:
             await context.send(f"Mae el {os.getenv('BOT_NAME', BOT_NAME)} no esta en ningun canal de voz.")
             return False
         return True
@@ -236,7 +241,7 @@ class MusicCog(commands.Cog):
         if voice_channel is None: # The play command will join the bot to the voice_channel
             connected = False
             # Try to connect to a voice channel if you are not already connected
-            if self.vc == "" or not self.vc:
+            if self.vc or not self.vc:
                 while connected == False:
                     try:
                         self.vc = await asyncio.shield(self.music_queue[0][1].connect())
@@ -254,7 +259,7 @@ class MusicCog(commands.Cog):
                     self.vc = await self.music_queue[0][1].connect()
 
         else: # The join command will join the bot to the voice channel
-            if self.vc == "" or not self.vc:
+            if not self.vc:
                 self.vc = await asyncio.shield(voice_channel.connect())
 
             elif self.vc.is_connected():
@@ -510,7 +515,7 @@ class MusicCog(commands.Cog):
             * context: Represents the context in which a command is being invoked under.
         """
         if await self.check_self_bot(context):
-            if self.vc != "": 
+            if self.vc: 
                 if self.vc.is_playing():
                     # This will trigger the lambda e function from play_next method to jump to the next song in queue
                     self.vc.stop()
@@ -588,11 +593,11 @@ class MusicCog(commands.Cog):
             * context: Represents the context in which a command is being invoked under.
         """
         if await self.check_self_bot(context):
-            if self.is_playing and self.vc != "":
+            if self.is_playing and self.vc:
                 self.vc.pause()
                 self.is_paused = True
                 self.is_playing = False
-                await context.send(f"Al {os.getenv('BOT_NAME', BOT_NAME)} se le paró ...la canción (╹ڡ╹ )")
+                await context.send(f"Al {os.getenv('BOT_NAME', BOT_NAME)} se le paró... la canción (╹ڡ╹ )")
     
 
     @commands.command(aliases=RESUME_COMMAND_ALIASES)
@@ -604,11 +609,11 @@ class MusicCog(commands.Cog):
             * context: Represents the context in which a command is being invoked under.
         """
         if await self.check_self_bot(context):
-            if self.is_paused == True and self.vc != "":
+            if self.is_paused == True and self.vc:
                 self.vc.resume()
                 self.is_paused = False
                 self.is_playing = True
-                await context.send(f"El {os.getenv('BOT_NAME', BOT_NAME)} seguirá tocando ...la canción ♪(´▽｀)") 
+                await context.send(f"El {os.getenv('BOT_NAME', BOT_NAME)} te seguirá tocando... la canción ♪(´▽｀)") 
 
 
     @commands.command(aliases=MOVE_COMMAND_ALIASES)
@@ -649,6 +654,11 @@ class MusicCog(commands.Cog):
 
     @commands.command(aliases=HELP_COMMAND_ALIASES)
     async def help_alias(self, context):
+        """
+        Command for displaying the available help_commands
+        Params:
+            * context: Represents the context in which a command is being invoked under.
+        """
         if self.test_mode == "True":
             accepted_channel = "marbot-test"
         elif self.test_mode == "False":
@@ -666,11 +676,19 @@ class MusicCog(commands.Cog):
             )
 
 
-    # @commands.command()
-    # @commands.check(check_if_music_channel)
-    # async def disconnect(self, context):
-        #if not ctx.voice_state.voice:
-        #     return await ctx.send("Not connected to any voice channel.")
-
-        # await ctx.voice_state.stop()
-        # del self.voice_states[ctx.guild.id]
+    @commands.command(aliases=DISCONNECT_COMMAND_ALIASES)
+    @commands.check(check_if_valid)
+    async def disconnect(self, context):
+        """
+        Command for disconnecting the music bot
+        Params:
+            * context: Represents the context in which a command is being invoked under.
+        """
+        if await self.check_self_bot(context):
+            if self.vc:
+                if self.vc.is_connected():
+                    voice_client = context.guild.voice_client
+                    await voice_client.disconnect()
+                    self.vc = None
+            else:
+                await context.send(f"El {os.getenv('BOT_NAME', BOT_NAME)} no está conectado a un canal de voz.")
