@@ -27,3 +27,6 @@ MOVE_COMMAND_ALIASES = ["mueva","m", "coleme"]
 
 ############################### Help Command
 HELP_COMMAND_ALIASES = ["h", "commands", "ayuda", "comandos", "info", "aiuda", "alias"]
+
+############################### Disconnect Command
+DISCONNECT_COMMAND_ALIASES = ["jale","desconectar", "apagar"]
