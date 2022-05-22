@@ -117,7 +117,7 @@ class MusicCog(commands.Cog):
         acepted_commands = ["play", "disconnect"]
         acepted_commands += PLAY_COMMAND_ALIASES
         acepted_commands += DISCONNECT_COMMAND_ALIASES
-        if self.vc and command not in acepted_commands:
+        if not self.vc and command not in acepted_commands:
             await context.send(f"Mae el {os.getenv('BOT_NAME', BOT_NAME)} no esta en ningun canal de voz.")
             return False
         return True
@@ -240,23 +240,23 @@ class MusicCog(commands.Cog):
         """
         if voice_channel is None: # The play command will join the bot to the voice_channel
             connected = False
+            
             # Try to connect to a voice channel if you are not already connected
-            if self.vc or not self.vc:
-                while connected == False:
-                    try:
-                        self.vc = await asyncio.shield(self.music_queue[0][1].connect())
-                        if self.vc.is_connected():
-                            connected = True
-                    except:
-                        print("Algo salio mal al conectar al bot.")
-                        break
-
-            elif self.vc.is_connected():
-                if self.vc.channel.name != self.music_queue[0][1].name:
-                    # If the bot is connected but not in the same voice channel as you,
-                    # move to that channel.
-                    self.vc = await self.vc.disconnect()
-                    self.vc = await self.music_queue[0][1].connect()
+            while connected == False:
+                try:
+                    self.vc = await asyncio.shield(self.music_queue[0][1].connect())
+                    if self.vc.is_connected():
+                        connected = True
+                except Exception:
+                    print("Algo salio mal al conectar al bot.")
+                    break
+            if self.vc:
+                if self.vc.is_connected():
+                    if self.vc.channel.name != self.music_queue[0][1].name:
+                        # If the bot is connected but not in the same voice channel as you,
+                        # move to that channel.
+                        self.vc = await self.vc.disconnect()
+                        self.vc = await self.music_queue[0][1].connect()
 
         else: # The join command will join the bot to the voice channel
             if not self.vc:
@@ -335,6 +335,17 @@ class MusicCog(commands.Cog):
             .add_field(name="Canciones", value=list_of_songs, inline=False)
         )
 
+    def clean_youtube_query(self, youtube_query):
+        """
+        Clean the youtube query to avoid known problems.
+        params:
+            * youtube_query: Youtube url to play.
+        """
+        # Clean videos with a timestamp, avoids request failing
+        if "&t=" in youtube_query:
+            return youtube_query.split("&t=")[0]
+        return youtube_query
+
     ################################################################### COMMANDS METHODS #########################################################
 
     @commands.command(aliases=PLAY_COMMAND_ALIASES)
@@ -357,6 +368,8 @@ class MusicCog(commands.Cog):
                 # This means it is a playlist
                 is_playlist = True
 
+            youtube_query = self.clean_youtube_query(youtube_query=youtube_query)
+
             if is_playlist:
 
                 playlist_info = self.search_youtube_playlist(youtube_query, voice_channel, context.author.nick)
@@ -378,7 +391,7 @@ class MusicCog(commands.Cog):
                 if not song_info: 
                     # This was done for the exception that search_youtube_url can throw if you try to
                     # reproduce a playlist or livestream. Search later if this can be avoided.
-                    await context.send("Mae no se pudo descargar la cancion. Probablemente por ser un livestream.")
+                    await context.send("Mae no se pudo descargar la cancion.")
                 else:
                     print(song_info)
                     self.music_queue.append([song_info, voice_channel])
@@ -690,5 +703,6 @@ class MusicCog(commands.Cog):
                     voice_client = context.guild.voice_client
                     await voice_client.disconnect()
                     self.vc = None
+                    self.is_playing = False
             else:
                 await context.send(f"El {os.getenv('BOT_NAME', BOT_NAME)} no está conectado a un canal de voz.")
