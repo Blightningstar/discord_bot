@@ -17,14 +17,14 @@ from .music_commands import (
 
 class MusicCog(commands.Cog):
     def __init__(self, bot):
-        self.bot = bot
+        self.bot = bot # Bot instance
 
         self.is_playing = False # To know when the bot is playing music
         self.is_queue_shuffled = False # To know when the queue has been shuffled
         self.is_paused = False # To know when the bot is paused
 
         self.music_queue = [] # [song, channel] The main music queue of songs to play
-        self.shuffled_music_queue = [] # [song, channel] used to store temporarily the shuffled queue, this avoids problems when a song is playing it stops
+        self.shuffled_music_queue = [] # [song, channel] used to store temporarily the shuffled queue, this avoids problems when a song is playing
         self.now_playing = [] # [song] To display the info of the current song playing
         self.embeded_queue = [] # The embed info of the queue embed messages
         self.entries_of_playlist = 0 # This is to keep track of the amount of songs in a playlist
@@ -35,6 +35,7 @@ class MusicCog(commands.Cog):
             "options": "-vn"
         }
 
+        # Based on git documentation https://github.com/ytdl-org/youtube-dl/blob/master/youtube_dl/YoutubeDL.py#L141
         self.YDL_OPTIONS = {
             "format": "bestaudio",
             "postprocessors": [{
@@ -52,11 +53,17 @@ class MusicCog(commands.Cog):
                 "preferredcodec": "mp3",
                 "preferredquality": "192",
             }],
+            "simulate": True,
             "ignoreerrors": True, # Do not stop on download errors.
         }
-        self.vc = None # Stores current channel
-        self.test_mode = os.getenv("TEST_MODE")
+        self.current_voice_channel = None # Stores current channel the bot is connected to
 
+        if os.getenv("DJANGO_ENV") == "PROD":
+            self.test_mode = False
+        elif os.getenv("DJANGO_ENV") == "DEV":
+            self.test_mode = True
+
+        # The endpoint in which the django web page documentation of music commands is running.
         self.help_commands_url = ""
         if os.getenv("DEPLOYED_ON") == "local":
             self.help_commands_url = "http://localhost:8080/marbotest/commands_help/"
@@ -78,11 +85,10 @@ class MusicCog(commands.Cog):
         Returns:
             * If the command is valid
         """
-        test_mode = os.getenv("TEST_MODE")
-        if test_mode == "True":
-            accepted_channel = "marbot-test"
-        elif test_mode == "False":
+        if os.getenv("DJANGO_ENV") == "PROD":
             accepted_channel = "music"
+        elif os.getenv("DJANGO_ENV") == "DEV":
+            accepted_channel = "marbot-test"
    
         if context.message.channel.name != accepted_channel:
             await context.send(f"Solo se puede usar la funcionalidad de música en el canal de '{accepted_channel}'.")
@@ -107,7 +113,7 @@ class MusicCog(commands.Cog):
             # This means the bot is currently playing a song
             if self.is_playing:
                 # This means that the user is not in the same channel as the bot
-                if context.author.voice.channel.name != self.vc.channel.name:
+                if context.author.voice.channel.name != self.current_voice_channel.channel.name:
                     await context.send(f"Mae no estás en el mismo canal de voz que {os.getenv('BOT_NAME', BOT_NAME)}.")
                     return False
 
@@ -117,7 +123,7 @@ class MusicCog(commands.Cog):
         acepted_commands = ["play", "disconnect"]
         acepted_commands += PLAY_COMMAND_ALIASES
         acepted_commands += DISCONNECT_COMMAND_ALIASES
-        if not self.vc and command not in acepted_commands:
+        if not self.current_voice_channel and command not in acepted_commands:
             await context.send(f"Mae el {os.getenv('BOT_NAME', BOT_NAME)} no esta en ningun canal de voz.")
             return False
         return True
@@ -230,44 +236,43 @@ class MusicCog(commands.Cog):
         self.processing_playlist = False
         self.entries_of_playlist = 0
     
-    async def try_to_connect(self, voice_channel=None):
+    async def try_to_connect(self, voice_channel_to_connect=None):
         """
-        Util method in charge of connecting for the first time the bot to start playing
-        the queue of music.
+        Util method in charge of connecting for the bot to a voice channel.
         Params:
-            * voice_channel: it is used to determine if the bot is joining the bot channel
+            * voice_channel_to_connect: it is used to determine if the bot is joining the bot channel
             by the join command or play command.
         """
-        if voice_channel is None: # The play command will join the bot to the voice_channel
+        if voice_channel_to_connect is None: # The play command will join the bot to the voice_channel
             connected = False
             
             # Try to connect to a voice channel if you are not already connected
             while connected == False:
                 try:
-                    self.vc = await asyncio.shield(self.music_queue[0][1].connect())
-                    if self.vc.is_connected():
+                    self.current_voice_channel = await asyncio.shield(self.music_queue[0][1].connect())
+                    if self.current_voice_channel.is_connected():
                         connected = True
                 except Exception:
                     print("Algo salio mal al conectar al bot.")
                     break
-            if self.vc:
-                if self.vc.is_connected():
-                    if self.vc.channel.name != self.music_queue[0][1].name:
+            if self.current_voice_channel:
+                if self.current_voice_channel.is_connected():
+                    if self.current_voice_channel.channel.name != self.music_queue[0][1].name:
                         # If the bot is connected but not in the same voice channel as you,
                         # move to that channel.
-                        self.vc = await self.vc.disconnect()
-                        self.vc = await self.music_queue[0][1].connect()
+                        self.current_voice_channel = await self.current_voice_channel.disconnect()
+                        self.current_voice_channel = await self.music_queue[0][1].connect()
 
         else: # The join command will join the bot to the voice channel
-            if not self.vc:
-                self.vc = await asyncio.shield(voice_channel.connect())
+            if not self.current_voice_channel:
+                self.current_voice_channel = await asyncio.shield(voice_channel_to_connect.connect())
 
-            elif self.vc.is_connected():
-                if self.vc.channel.name != voice_channel.name:
+            elif self.current_voice_channel.is_connected():
+                if self.current_voice_channel.channel.name != voice_channel_to_connect.name:
                     # If the bot is connected but not in the same voice channel as you,
                     # move to that channel.
-                    self.vc = await self.vc.disconnect()
-                    self.vc = await voice_channel.connect()
+                    self.current_voice_channel = await self.current_voice_channel.disconnect()
+                    self.current_voice_channel = await voice_channel_to_connect.connect()
 
 
     def play_next(self):
@@ -296,9 +301,9 @@ class MusicCog(commands.Cog):
                 # The Voice Channel we are currently on will start playing the next song
                 # Once that song is over "after=lambda e: self.play_next()" will play the 
                 # next song if it there is another one queued.
-                self.vc.play(discord.FFmpegPCMAudio(next_song_url, **self.FFMPEG_OPTIONS ), after=lambda e: self.play_next())
-                self.vc.source = discord.PCMVolumeTransformer(self.vc.source)
-                self.vc.source.volume = 0.7
+                self.current_voice_channel.play(discord.FFmpegPCMAudio(next_song_url, **self.FFMPEG_OPTIONS ), after=lambda e: self.play_next())
+                self.current_voice_channel.source = discord.PCMVolumeTransformer(self.current_voice_channel.source)
+                self.current_voice_channel.source.volume = 0.7
 
             except Exception as e:
                 print(e)
@@ -528,10 +533,10 @@ class MusicCog(commands.Cog):
             * context: Represents the context in which a command is being invoked under.
         """
         if await self.check_self_bot(context):
-            if self.vc: 
-                if self.vc.is_playing():
+            if self.current_voice_channel: 
+                if self.current_voice_channel.is_playing():
                     # This will trigger the lambda e function from play_next method to jump to the next song in queue
-                    self.vc.stop()
+                    self.current_voice_channel.stop()
                 else:
                     await context.send(f"{os.getenv('BOT_NAME', BOT_NAME)} no esta tocando ninguna canción.")  
             else:
@@ -606,8 +611,8 @@ class MusicCog(commands.Cog):
             * context: Represents the context in which a command is being invoked under.
         """
         if await self.check_self_bot(context):
-            if self.is_playing and self.vc:
-                self.vc.pause()
+            if self.is_playing and self.current_voice_channel:
+                self.current_voice_channel.pause()
                 self.is_paused = True
                 self.is_playing = False
                 await context.send(f"Al {os.getenv('BOT_NAME', BOT_NAME)} se le paró... la canción (╹ڡ╹ )")
@@ -622,8 +627,8 @@ class MusicCog(commands.Cog):
             * context: Represents the context in which a command is being invoked under.
         """
         if await self.check_self_bot(context):
-            if self.is_paused == True and self.vc:
-                self.vc.resume()
+            if self.is_paused == True and self.current_voice_channel:
+                self.current_voice_channel.resume()
                 self.is_paused = False
                 self.is_playing = True
                 await context.send(f"El {os.getenv('BOT_NAME', BOT_NAME)} te seguirá tocando... la canción ♪(´▽｀)") 
@@ -698,11 +703,11 @@ class MusicCog(commands.Cog):
             * context: Represents the context in which a command is being invoked under.
         """
         if await self.check_self_bot(context):
-            if self.vc:
-                if self.vc.is_connected():
+            if self.current_voice_channel:
+                if self.current_voice_channel.is_connected():
                     voice_client = context.guild.voice_client
                     await voice_client.disconnect()
-                    self.vc = None
+                    self.current_voice_channel = None
                     self.is_playing = False
             else:
                 await context.send(f"El {os.getenv('BOT_NAME', BOT_NAME)} no está conectado a un canal de voz.")
