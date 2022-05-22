@@ -5,7 +5,12 @@ import numpy as np
 import json, requests
 from discord.ext import commands
 from youtube_dl import YoutubeDL
-from discord_bot.settings.base import BOT_NAME
+
+if os.getenv("DJANGO_ENV") == "PROD":
+    from discord_bot.settings.production import BOT_NAME
+elif os.getenv("DJANGO_ENV") == "DEV":
+    from discord_bot.settings.dev import BOT_NAME
+
 from .music_commands import (
     PLAY_COMMAND_ALIASES, QUEUE_COMMAND_ALIASES, 
     SKIP_COMMAND_ALIASES, SHUFFLE_COMMAND_ALIASES, 
@@ -43,6 +48,7 @@ class MusicCog(commands.Cog):
                 "preferredcodec": "mp3",
                 "preferredquality": "192",
             }],
+            "age_limit": 40,
             "simulate": True,
         }
 
@@ -53,7 +59,9 @@ class MusicCog(commands.Cog):
                 "preferredcodec": "mp3",
                 "preferredquality": "192",
             }],
+            "age_limit": 40,
             "simulate": True,
+            "extract_flat": "in_playlist",
             "ignoreerrors": True, # Do not stop on download errors.
         }
         self.current_voice_channel = None # Stores current channel the bot is connected to
@@ -114,7 +122,7 @@ class MusicCog(commands.Cog):
             if self.is_playing:
                 # This means that the user is not in the same channel as the bot
                 if context.author.voice.channel.name != self.current_voice_channel.channel.name:
-                    await context.send(f"Mae no estás en el mismo canal de voz que {os.getenv('BOT_NAME', BOT_NAME)}.")
+                    await context.send(f"Mae no estás en el mismo canal de voz que {BOT_NAME}.")
                     return False
 
         command = (context.message.clean_content).split(" ")[0] # Get the command the user used.
@@ -124,7 +132,7 @@ class MusicCog(commands.Cog):
         acepted_commands += PLAY_COMMAND_ALIASES
         acepted_commands += DISCONNECT_COMMAND_ALIASES
         if not self.current_voice_channel and command not in acepted_commands:
-            await context.send(f"Mae el {os.getenv('BOT_NAME', BOT_NAME)} no esta en ningun canal de voz.")
+            await context.send(f"Mae el {BOT_NAME} no esta en ningun canal de voz.")
             return False
         return True
 
@@ -175,7 +183,7 @@ class MusicCog(commands.Cog):
         Returns:
             * All the required info of the youtube url.
         """
-        if self.test_mode == "True":
+        if self.test_mode:
             self.YDL_OPTIONS["cookiefile"] = os.getenv('COOKIE_FILE', "")
 
         with YoutubeDL(self.YDL_OPTIONS) as ydl:
@@ -204,7 +212,7 @@ class MusicCog(commands.Cog):
             * relevant_data: The array with necessary info of the song along with the 
                             voice channel the audio will play.
         """
-        if self.test_mode == "True":
+        if self.test_mode:
             self.YDL_OPTIONS_PLAYLIST["cookiefile"] = os.getenv('COOKIE_FILE', "")
         
         item = 0
@@ -538,9 +546,9 @@ class MusicCog(commands.Cog):
                     # This will trigger the lambda e function from play_next method to jump to the next song in queue
                     self.current_voice_channel.stop()
                 else:
-                    await context.send(f"{os.getenv('BOT_NAME', BOT_NAME)} no esta tocando ninguna canción.")  
+                    await context.send(f"{BOT_NAME} no esta tocando ninguna canción.")  
             else:
-                await context.send(f"Actualmente {os.getenv('BOT_NAME', BOT_NAME)} no está en un canal de voz.")
+                await context.send(f"Actualmente {BOT_NAME} no está en un canal de voz.")
 
     
     @commands.command(aliases=SHUFFLE_COMMAND_ALIASES)
@@ -615,7 +623,7 @@ class MusicCog(commands.Cog):
                 self.current_voice_channel.pause()
                 self.is_paused = True
                 self.is_playing = False
-                await context.send(f"Al {os.getenv('BOT_NAME', BOT_NAME)} se le paró... la canción (╹ڡ╹ )")
+                await context.send(f"Al {BOT_NAME} se le paró... la canción (╹ڡ╹ )")
     
 
     @commands.command(aliases=RESUME_COMMAND_ALIASES)
@@ -631,7 +639,7 @@ class MusicCog(commands.Cog):
                 self.current_voice_channel.resume()
                 self.is_paused = False
                 self.is_playing = True
-                await context.send(f"El {os.getenv('BOT_NAME', BOT_NAME)} te seguirá tocando... la canción ♪(´▽｀)") 
+                await context.send(f"El {BOT_NAME} te seguirá tocando... la canción ♪(´▽｀)") 
 
 
     @commands.command(aliases=MOVE_COMMAND_ALIASES)
@@ -677,9 +685,9 @@ class MusicCog(commands.Cog):
         Params:
             * context: Represents the context in which a command is being invoked under.
         """
-        if self.test_mode == "True":
+        if self.test_mode:
             accepted_channel = "marbot-test"
-        elif self.test_mode == "False":
+        else:
             accepted_channel = "music"
 
         if context.message.channel.name != accepted_channel:
@@ -709,5 +717,8 @@ class MusicCog(commands.Cog):
                     await voice_client.disconnect()
                     self.current_voice_channel = None
                     self.is_playing = False
+                    self.music_queue = []
+                    self.now_playing = []
+                    self.entries_of_playlist = 0
             else:
-                await context.send(f"El {os.getenv('BOT_NAME', BOT_NAME)} no está conectado a un canal de voz.")
+                await context.send(f"El {BOT_NAME} no está conectado a un canal de voz.")
