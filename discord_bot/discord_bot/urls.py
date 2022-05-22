@@ -23,7 +23,7 @@ if os.getenv("DJANGO_ENV") == "PROD":
 elif os.getenv("DJANGO_ENV") == "DEV":
     from discord_bot.settings.dev import BOT_NAME
 
-url_bot_name = str(os.getenv("BOT_NAME", BOT_NAME)).lower()
+url_bot_name = str(BOT_NAME).lower()
 urlpatterns = [
     path("", home, name="home"),
     path('admin/', admin.site.urls),
