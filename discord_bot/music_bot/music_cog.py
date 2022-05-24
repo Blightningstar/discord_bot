@@ -251,7 +251,7 @@ class MusicCog(commands.Cog):
             * voice_channel_to_connect: it is used to determine if the bot is joining the bot channel
             by the join command or play command.
         """
-        if voice_channel_to_connect is None: # The play command will join the bot to the voice_channel
+        if voice_channel_to_connect is None and not self.current_voice_channel: # The play command will join the bot to the voice_channel
             connected = False
             
             # Try to connect to a voice channel if you are not already connected
@@ -259,23 +259,21 @@ class MusicCog(commands.Cog):
                 try:
                     self.current_voice_channel = await asyncio.shield(self.music_queue[0][1].connect())
                     if self.current_voice_channel.is_connected():
+                        if self.current_voice_channel.channel.name != self.music_queue[0][1].name:
+                        # If the bot is connected but not in the same voice channel as you,
+                        # move to that channel.
+                            self.current_voice_channel = await self.current_voice_channel.disconnect()
+                            self.current_voice_channel = await self.music_queue[0][1].connect()
                         connected = True
                 except Exception:
                     print("Algo salio mal al conectar al bot.")
                     break
-            if self.current_voice_channel:
-                if self.current_voice_channel.is_connected():
-                    if self.current_voice_channel.channel.name != self.music_queue[0][1].name:
-                        # If the bot is connected but not in the same voice channel as you,
-                        # move to that channel.
-                        self.current_voice_channel = await self.current_voice_channel.disconnect()
-                        self.current_voice_channel = await self.music_queue[0][1].connect()
 
         else: # The join command will join the bot to the voice channel
             if not self.current_voice_channel:
                 self.current_voice_channel = await asyncio.shield(voice_channel_to_connect.connect())
 
-            elif self.current_voice_channel.is_connected():
+            elif self.current_voice_channel and self.current_voice_channel.is_connected():
                 if self.current_voice_channel.channel.name != voice_channel_to_connect.name:
                     # If the bot is connected but not in the same voice channel as you,
                     # move to that channel.
@@ -375,8 +373,8 @@ class MusicCog(commands.Cog):
             youtube_query = " ".join(args)
             is_playlist = False
             amount_songs_added_from_playlist = 0
-
             voice_channel = context.author.voice.channel
+
             if "list" in youtube_query:
                 # This means it is a playlist
                 is_playlist = True
@@ -404,9 +402,8 @@ class MusicCog(commands.Cog):
                 if not song_info: 
                     # This was done for the exception that search_youtube_url can throw if you try to
                     # reproduce a playlist or livestream. Search later if this can be avoided.
-                    await context.send("Mae no se pudo descargar la cancion.")
+                    await context.send("Mae no se pudo descargar la canción.")
                 else:
-                    print(song_info)
                     self.music_queue.append([song_info, voice_channel])
                     await context.send("Canción añadida a la colaヾ(•ω•`)o")
 
