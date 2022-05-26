@@ -180,7 +180,7 @@ class MusicCog(commands.Cog):
                 await context.send("Mae la playlist de Youtube está vacia.")
                 break
 
-        return video_count, video_list
+        return video_list
 
     def _search_youtube_url(self, item, author):
         """
@@ -316,7 +316,13 @@ class MusicCog(commands.Cog):
                 # is needed later.
                 if len(self.now_playing) > 0:
                     self.now_playing.pop()
-                self.now_playing.append(self.music_queue.pop(0)[0])
+
+                if next_song_info:
+                    self.now_playing.append(next_song_info)
+                    self.music_queue.pop(0)[0]
+                    next_song_info = ""
+                else:
+                    self.now_playing.append(self.music_queue.pop(0)[0])
 
                 # The Voice Channel we are currently on will start playing the next song
                 # Once that song is over "after=lambda e: self._play_next()" will play the 
