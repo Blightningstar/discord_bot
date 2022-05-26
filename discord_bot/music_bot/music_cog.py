@@ -149,7 +149,7 @@ class MusicCog(commands.Cog):
         playlist_id = url.split("list=")[1]
 
         URL1 = "https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&maxResults=50&fields=items/contentDetails/videoId,nextPageToken&key={}&playlistId={}&pageToken=".format(youtube_api_key, playlist_id)
-    
+        # TODO VER SI EL LINK DE ARRIBA PERMITE CON EL fields=items/contentDetails/videoId TRAER LA INFO QUE OBTENEMOS AL DESCARGAR.
         next_page = ""
         video_count = 0
         video_list = []
@@ -294,6 +294,7 @@ class MusicCog(commands.Cog):
         """
         if len(self.music_queue) > 0:
             self.is_playing = True
+            next_song_info = ""
             try:
                 if self.is_queue_shuffled == True:
                     # Check if the queue is shuffled to update the queue.
@@ -466,14 +467,26 @@ class MusicCog(commands.Cog):
 
 
                 while embed_songs < len(queue_display_list):
-                    title = queue_display_list[embed_songs][0]["title"]
-                    url = queue_display_list[embed_songs][0]["url"]
-                    duration = queue_display_list[embed_songs][0]["duration"]
-                    author = queue_display_list[embed_songs][0]["author"]
+                    next_song_info = ""
+                    song_info = queue_display_list[embed_songs][0]
+                    if song_info["status"] == "needs_download":
+                        next_song_info = self._search_youtube_url(
+                            item=self.music_queue[embed_songs][0]["url"],
+                            author=self.music_queue[embed_songs][0]["author"]
+                        )
+                        title = next_song_info["title"]
+                        url = next_song_info["url"]
+                        duration = next_song_info["duration"]
+                        author = next_song_info["author"]
+                    else:
+                        title = queue_display_list[embed_songs][0]["title"]
+                        url = queue_display_list[embed_songs][0]["url"]
+                        duration = queue_display_list[embed_songs][0]["duration"]
+                        author = queue_display_list[embed_songs][0]["author"]
 
                     embed_message = f"`{queue_display_msg}{str(embed_songs+1)} -` [{title}]({url})|`{self._convert_seconds(duration)} ({author})`\n"
 
-                    if len(embed_message) < 1024:
+                    if len(embed_message) < 1024: # TODO NEED TO MAKE THIS ONLY LOAD 
                         # This means we reached the maximun that an embed field can handle.
                         if embed_songs < len(queue_display_list):
                             # If we haven't reached the end of the music_queue
@@ -601,7 +614,6 @@ class MusicCog(commands.Cog):
         Params:
             * context: Represents the context in which a command is being invoked under.
         """
-        #TODO: NEED TO THINK HOW TO MODIFY THIS TO WORK WITH THE NEW WAY OF PROCESSING PLAYLISTS AND QUEUE MUSIC
         if await self._check_self_bot(context):
             if self.is_playing:
                 title = self.now_playing[0]["title"]
