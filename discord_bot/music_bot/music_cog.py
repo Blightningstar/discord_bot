@@ -456,6 +456,7 @@ class MusicCog(commands.Cog):
                 queue_display_list = [] # Local list so when a song leaves the queue doesn't generate an index error.
                 self.embeded_queue = [] # We reset the embeded queue if multiple calls of queue command are done.
                 queue_duration = 0 # Total duration of all the songs in queue.
+                
 
                 if self.is_queue_shuffled == True:
                     # We want to show the user the queue shuffled if he calls this command
@@ -474,6 +475,9 @@ class MusicCog(commands.Cog):
                             item=self.music_queue[embed_songs][0]["url"],
                             author=self.music_queue[embed_songs][0]["author"]
                         )
+                        self.music_queue[embed_songs][0] = next_song_info
+                        queue_display_list[embed_songs][0] = next_song_info
+
                         title = next_song_info["title"]
                         url = next_song_info["url"]
                         duration = next_song_info["duration"]
