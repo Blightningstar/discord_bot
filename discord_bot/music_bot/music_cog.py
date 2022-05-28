@@ -1,10 +1,13 @@
 import discord
 import os
+import re
 import asyncio
 import numpy as np
 import json, requests
 from discord.ext import commands
 from youtube_dl import YoutubeDL
+from googleapiclient.discovery import build
+from datetime import timedelta
 
 if os.getenv("DJANGO_ENV") == "PROD":
     from discord_bot.settings.production import BOT_NAME
@@ -32,6 +35,9 @@ class MusicCog(commands.Cog):
         self.shuffled_music_queue = [] # [song, channel] used to store temporarily the shuffled queue, this avoids problems when a song is playing
         self.now_playing = [] # [song] To display the info of the current song playing
         self.embeded_queue = [] # The embed info of the queue embed messages
+        
+        self.youtube_api_key = os.getenv("YT_API_KEY")
+        self.youtube = build("youtube", "v3", developerKey=self.youtube_api_key)
 
         self.FFMPEG_OPTIONS = {
             "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
@@ -134,53 +140,6 @@ class MusicCog(commands.Cog):
             return False
         return True
 
-    async def _get_youtube_playlist(self, url, context):
-        """
-        Util Method that requests via Youtube API the song id's of a playlist.
-        Params:
-            * url: the url of the youtube playlist.
-            * context: The information of where the request was sent
-        Returns:
-            * video_count: The amount of videos inside the youtube playlist.
-            * video_list: A list with all the ids of the videos from the youtube playlist. 
-        """
-        youtube_api_key = os.getenv("YT_API_KEY")
-
-        playlist_id = url.split("list=")[1]
-
-        URL1 = "https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&maxResults=50&fields=items/contentDetails/videoId,nextPageToken&key={}&playlistId={}&pageToken=".format(youtube_api_key, playlist_id)
-        # TODO VER SI EL LINK DE ARRIBA PERMITE CON EL fields=items/contentDetails/videoId TRAER LA INFO QUE OBTENEMOS AL DESCARGAR.
-        next_page = ""
-        video_count = 0
-        video_list = []
-
-        while True:
-            videos_in_page = [] 
-            # headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:92.0) Gecko/20100101 Firefox/92.0"}
-
-            results = json.loads(requests.get(URL1 + next_page).text)
-            if results.get("items", None):
-                for item in results["items"]:
-                    videos_in_page.append(item["contentDetails"]["videoId"])
-                    
-                video_list.extend(videos_in_page)
-                video_count += len(videos_in_page)
-
-                if "nextPageToken" in results:
-                    next_page = results["nextPageToken"]
-                else:
-                    print("No. of videos: " + str(video_count))
-                    break
-            elif results.get("error"):
-                error_reason = results["error"].get("errors")[0].get("reason")
-                if error_reason == "playlistNotFound":
-                    await context.send("Mae la playlist de Youtube está como privada. Pruebe cambiandola a Unlisted o Public")
-                    break
-            else:
-                await context.send("Mae la playlist de Youtube está vacia.")
-                break
-
-        return video_list
 
     def _search_youtube_url(self, item, author):
         """
@@ -217,38 +176,84 @@ class MusicCog(commands.Cog):
             * url: This is playlist url from youtube (Public or Unlisted)
             * context: The information of where the request was sent
         Returns:
-            * relevant_data: The array with necessary info of the song along with the 
+            * relevant_data: The array with necessary info of each song along with the 
                             voice channel the audio will play.
         """
-        if self.test_mode:
-            self.YDL_OPTIONS_PLAYLIST["cookiefile"] = os.getenv('COOKIE_FILE', "")
-        
         relevant_data = []
+        playlist_id = url.split("list=")[1]
+        URL1 = "https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&maxResults=50&fields=items/contentDetails/videoId,nextPageToken&key={}&playlistId={}&pageToken=".format(self.youtube_api_key, playlist_id)
+        next_page = ""
+        video_count = 0
+        video_list = []
 
-        video_ids = await self._get_youtube_playlist(url, context)
-        relevant_data.extend(video_ids)
+        while True:
+            videos_in_page = []
+
+            results = json.loads(requests.get(URL1 + next_page).text)
+            if results.get("items", None):
+                for item in results["items"]:
+                    videos_in_page.append(item["contentDetails"]["videoId"])
+                video_list.extend(videos_in_page)
+                video_count += len(videos_in_page)
+
+                if "nextPageToken" in results:
+                    next_page = results["nextPageToken"]
+                else:
+                    print("No. of videos: " + str(video_count))
+                    break
+            elif results.get("error"):
+                error_reason = results["error"].get("errors")[0].get("reason")
+                if error_reason == "playlistNotFound":
+                    await context.send("Mae la playlist de Youtube está como privada. Pruebe cambiandola a Unlisted o Public")
+                    break
+            else:
+                await context.send("Mae la playlist de Youtube está vacia.")
+                break
+
+
+        for video in video_list:
+            videos_request = self.youtube.videos().list(
+                part="contentDetails, snippet",
+                id=video
+            )
+            video_response = videos_request.execute()
+            items = video_response.get("items", None)
+            if items:
+                content_details = items[0].get("contentDetails")
+                snippet = items[0].get("snippet")
+                duration = content_details.get("duration")
+
+                hours_pattern = re.compile(r"(\d+)H")
+                minutes_pattern = re.compile(r"(\d+)M")
+                seconds_pattern = re.compile(r"(\d+)S")
+
+                hours = hours_pattern.search(duration)
+                minutes = minutes_pattern.search(duration)
+                seconds = seconds_pattern.search(duration)
+
+                hours = int(hours.group(1)) if hours else 0
+                minutes = int(minutes.group(1)) if minutes else 0 
+                seconds = int(seconds.group(1)) if seconds else 0
+
+                video_seconds = timedelta(
+                    hours = hours,
+                    minutes = minutes,
+                    seconds = seconds
+                ).total_seconds()
+
+                video_info = {
+                    "source": "",
+                    "title": snippet.get("title"), 
+                    "duration": video_seconds, 
+                    "thumbnail": snippet.get("thumbnails").get("default").get("url"),
+                    "url": f"https://youtu.be/{video}",
+                    "author": context.author.nick
+                }
+                relevant_data.append(video_info)
+
         return relevant_data
-        # with YoutubeDL(self.YDL_OPTIONS_PLAYLIST) as ydl:
-        #     while item < (self.entries_of_playlist):
-        #         video_url = f"https://youtu.be/{video_ids[item]}"
-        #         try:
-        #             info = ydl.extract_info(video_url, download=False)
-        #             relevant_data.append([{
-        #                 "source": info["formats"][0]["url"], 
-        #                 "title": info["title"], 
-        #                 "duration": info["duration"], 
-        #                 "thumbnail": info["thumbnail"],
-        #                 "url": info["webpage_url"],
-        #                 "author": context.author.nick
-        #             }, voice_channel])
-        #             yield relevant_data
-        #             relevant_data = []
-        #             item += 1
-        #         except Exception as e:
-        #             print(f"Error while fetching data of {video_ids[item]}: {e}")
-        #             relevant_data = []
-        #             item += 1
-    
+        
+
     async def _try_to_connect(self, voice_channel_to_connect=None):
         """
         Util method in charge of connecting for the bot to a voice channel.
@@ -303,7 +308,7 @@ class MusicCog(commands.Cog):
                     self.is_queue_shuffled = False
 
                 # Get the first url
-                if self.music_queue[0][0].get("status") == "needs_download": # TEST THIS
+                if self.music_queue[0][0].get("source") == "":
                     next_song_info = self._search_youtube_url(
                         item=self.music_queue[0][0]["url"],
                         author=self.music_queue[0][0]["author"]
@@ -409,12 +414,7 @@ class MusicCog(commands.Cog):
                     await context.send("Mae no se pudo poner la playlist.")
                 else:
                     for video in playlist_info:
-                        video_info = {
-                            "url": f"https://youtu.be/{video}",
-                            "status": "needs_download",
-                            "author": context.author.nick
-                        }
-                        self.music_queue.append([video_info, voice_channel])
+                        self.music_queue.append([video, voice_channel])
                         amount_songs_added_from_playlist += 1
                         if amount_songs_added_from_playlist == 1:
                             if self.is_playing == False and self.is_paused == False:
@@ -470,23 +470,23 @@ class MusicCog(commands.Cog):
                 while embed_songs < len(queue_display_list):
                     next_song_info = ""
                     song_info = queue_display_list[embed_songs][0]
-                    if song_info["status"] == "needs_download":
-                        next_song_info = self._search_youtube_url(
-                            item=self.music_queue[embed_songs][0]["url"],
-                            author=self.music_queue[embed_songs][0]["author"]
-                        )
-                        self.music_queue[embed_songs][0] = next_song_info
-                        queue_display_list[embed_songs][0] = next_song_info
+                    # if song_info["source"] == "":
+                    #     next_song_info = self._search_youtube_url(
+                    #         item=self.music_queue[embed_songs][0]["url"],
+                    #         author=self.music_queue[embed_songs][0]["author"]
+                    #     )
+                    #     self.music_queue[embed_songs][0] = next_song_info
+                    #     queue_display_list[embed_songs][0] = next_song_info
 
-                        title = next_song_info["title"]
-                        url = next_song_info["url"]
-                        duration = next_song_info["duration"]
-                        author = next_song_info["author"]
-                    else:
-                        title = queue_display_list[embed_songs][0]["title"]
-                        url = queue_display_list[embed_songs][0]["url"]
-                        duration = queue_display_list[embed_songs][0]["duration"]
-                        author = queue_display_list[embed_songs][0]["author"]
+                    #     title = next_song_info["title"]
+                    #     url = next_song_info["url"]
+                    #     duration = next_song_info["duration"]
+                    #     author = next_song_info["author"]
+                    # else:
+                    title = queue_display_list[embed_songs][0]["title"]
+                    url = queue_display_list[embed_songs][0]["url"]
+                    duration = queue_display_list[embed_songs][0]["duration"]
+                    author = queue_display_list[embed_songs][0]["author"]
 
                     embed_message = f"`{queue_display_msg}{str(embed_songs+1)} -` [{title}]({url})|`{self._convert_seconds(duration)} ({author})`\n"
 
