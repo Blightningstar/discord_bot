@@ -17,6 +17,7 @@ schedule = "*"
 six = "*"
 youtube-dl = "*"
 gunicorn = "*"
+google-api-python-client = "*"
 
 [dev-packages]
 
