@@ -168,6 +168,35 @@ class MusicCog(commands.Cog):
             "author": author
         }
 
+    def _format_youtube_duration(self, video_duration):
+        """
+        Util method that takes the duration of a video in youtube's format and converts it
+        to seconds.
+        Params:
+            * video_duration: Youtube's video duration in its original format, ex: 
+        Returns:
+            * duration_in_seconds: Video's duration converted in seconds, ex: 132.0
+        """
+        hours_pattern = re.compile(r"(\d+)H")
+        minutes_pattern = re.compile(r"(\d+)M")
+        seconds_pattern = re.compile(r"(\d+)S")
+
+        hours = hours_pattern.search(video_duration)
+        minutes = minutes_pattern.search(video_duration)
+        seconds = seconds_pattern.search(video_duration)
+
+        hours = int(hours.group(1)) if hours else 0
+        minutes = int(minutes.group(1)) if minutes else 0 
+        seconds = int(seconds.group(1)) if seconds else 0
+
+        duration_in_seconds = timedelta(
+            hours = hours,
+            minutes = minutes,
+            seconds = seconds
+        ).total_seconds()
+
+        return duration_in_seconds
+
     async def _search_youtube_playlist(self, url, context):
         """
         Util method that takes care of fetching necessary info from a youtube url or item
@@ -211,10 +240,10 @@ class MusicCog(commands.Cog):
                 break
 
 
-        for video in video_list:
+        for video_id in video_list:
             videos_request = self.youtube.videos().list(
                 part="contentDetails, snippet",
-                id=video
+                id=video_id
             )
             video_response = videos_request.execute()
             items = video_response.get("items", None)
@@ -223,33 +252,24 @@ class MusicCog(commands.Cog):
                 snippet = items[0].get("snippet")
                 duration = content_details.get("duration")
 
-                hours_pattern = re.compile(r"(\d+)H")
-                minutes_pattern = re.compile(r"(\d+)M")
-                seconds_pattern = re.compile(r"(\d+)S")
-
-                hours = hours_pattern.search(duration)
-                minutes = minutes_pattern.search(duration)
-                seconds = seconds_pattern.search(duration)
-
-                hours = int(hours.group(1)) if hours else 0
-                minutes = int(minutes.group(1)) if minutes else 0 
-                seconds = int(seconds.group(1)) if seconds else 0
-
-                video_seconds = timedelta(
-                    hours = hours,
-                    minutes = minutes,
-                    seconds = seconds
-                ).total_seconds()
-
                 video_info = {
                     "source": "",
                     "title": snippet.get("title"), 
-                    "duration": video_seconds, 
+                    "duration": self._format_youtube_duration(duration), 
                     "thumbnail": snippet.get("thumbnails").get("default").get("url"),
-                    "url": f"https://youtu.be/{video}",
+                    "url": f"https://youtu.be/{video_id}",
                     "author": context.author.nick
                 }
-                relevant_data.append(video_info)
+            else:
+                video_info = {
+                    "source": "",
+                    "title": "",
+                    "duration": "",
+                    "thumbnail": "",
+                    "url": f"https://youtu.be/{video_id}",
+                    "author": context.author.nick
+                }
+            relevant_data.append(video_info)
 
         return relevant_data
         
@@ -470,23 +490,31 @@ class MusicCog(commands.Cog):
                 while embed_songs < len(queue_display_list):
                     next_song_info = ""
                     song_info = queue_display_list[embed_songs][0]
-                    # if song_info["source"] == "":
-                    #     next_song_info = self._search_youtube_url(
-                    #         item=self.music_queue[embed_songs][0]["url"],
-                    #         author=self.music_queue[embed_songs][0]["author"]
-                    #     )
-                    #     self.music_queue[embed_songs][0] = next_song_info
-                    #     queue_display_list[embed_songs][0] = next_song_info
+                    if song_info["title"] == "" or song_info["duration"] == "":
+                        # This means Youtube Data API couldn't retrieve the information for the song.
+                        # So we need to fetch it to be able to display it in the queue
+                        next_song_info = self._search_youtube_url(
+                            item=self.music_queue[embed_songs][0]["url"],
+                            author=self.music_queue[embed_songs][0]["author"]
+                        )
+                        if next_song_info: 
+                            # If by using youtubedl to download the info of the song did
+                            self.music_queue[embed_songs][0] = next_song_info
+                            queue_display_list[embed_songs][0] = next_song_info
+                            title = next_song_info["title"]
+                            url = next_song_info["url"]
+                            duration = next_song_info["duration"]
+                            author = next_song_info["author"]
+                        else:
+                            # If by using youtubedl to download the info of the song didn't
+                            # work then we can't play it, so let's remove it from the queue
+                            self.music_queue.pop(embed_songs)
 
-                    #     title = next_song_info["title"]
-                    #     url = next_song_info["url"]
-                    #     duration = next_song_info["duration"]
-                    #     author = next_song_info["author"]
-                    # else:
-                    title = queue_display_list[embed_songs][0]["title"]
-                    url = queue_display_list[embed_songs][0]["url"]
-                    duration = queue_display_list[embed_songs][0]["duration"]
-                    author = queue_display_list[embed_songs][0]["author"]
+                    else:
+                        title = queue_display_list[embed_songs][0]["title"]
+                        url = queue_display_list[embed_songs][0]["url"]
+                        duration = queue_display_list[embed_songs][0]["duration"]
+                        author = queue_display_list[embed_songs][0]["author"]
 
                     embed_message = f"`{queue_display_msg}{str(embed_songs+1)} -` [{title}]({url})|`{self._convert_seconds(duration)} ({author})`\n"
 
