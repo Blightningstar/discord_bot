@@ -133,8 +133,8 @@ class MusicCog(commands.Cog):
         # If the command is not the play or disconnect one it is an error. 
         # Since play connects the bot and disconnects makes it leave a voice channel.
         acepted_commands = ["play", "disconnect"]
-        acepted_commands += PLAY_COMMAND_ALIASES
-        acepted_commands += DISCONNECT_COMMAND_ALIASES
+        acepted_commands.extend(PLAY_COMMAND_ALIASES)
+        acepted_commands.extend(DISCONNECT_COMMAND_ALIASES)
         if not self.current_voice_channel and command not in acepted_commands:
             await context.send(f"Mae el {BOT_NAME} no esta en ningun canal de voz.")
             return False
@@ -212,7 +212,6 @@ class MusicCog(commands.Cog):
         playlist_id = url.split("list=")[1]
         URL1 = "https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&maxResults=50&fields=items/contentDetails/videoId,nextPageToken&key={}&playlistId={}&pageToken=".format(self.youtube_api_key, playlist_id)
         next_page = ""
-        video_count = 0
         video_list = []
 
         while True:
@@ -220,15 +219,15 @@ class MusicCog(commands.Cog):
 
             results = json.loads(requests.get(URL1 + next_page).text)
             if results.get("items", None):
-                for item in results["items"]:
+                for video_count, item in enumerate(results["items"]):
                     videos_in_page.append(item["contentDetails"]["videoId"])
+
                 video_list.extend(videos_in_page)
-                video_count += len(videos_in_page)
 
                 if "nextPageToken" in results:
                     next_page = results["nextPageToken"]
                 else:
-                    print("No. of videos: " + str(video_count))
+                    print(f"No. of videos: {video_count}")
                     break
             elif results.get("error"):
                 error_reason = results["error"].get("errors")[0].get("reason")
@@ -418,7 +417,6 @@ class MusicCog(commands.Cog):
         if await self._check_self_bot(context):
             youtube_query = " ".join(args)
             is_playlist = False
-            amount_songs_added_from_playlist = 0
             voice_channel = context.author.voice.channel
 
             if "list" in youtube_query:
@@ -433,16 +431,15 @@ class MusicCog(commands.Cog):
                 if not playlist_info: 
                     await context.send("Mae no se pudo poner la playlist.")
                 else:
-                    for video in playlist_info:
+                    for songs_added, video in enumerate(playlist_info):
                         self.music_queue.append([video, voice_channel])
-                        amount_songs_added_from_playlist += 1
-                        if amount_songs_added_from_playlist == 1:
+                        if songs_added == 1:
                             if self.is_playing == False and self.is_paused == False:
                                 # Try to connect to a voice channel if you are not already connected
                                 await self._try_to_connect()
                                 self._play_next()
 
-                    await context.send(f"{amount_songs_added_from_playlist} canciones añadidas a la colaヾ(•ω•`)o")
+                    await context.send(f"{songs_added} canciones añadidas a la colaヾ(•ω•`)o")
             else:    
                 song_info = self._search_youtube_url(youtube_query, context.author.nick)
                 if not song_info: 
