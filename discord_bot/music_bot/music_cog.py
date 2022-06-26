@@ -294,8 +294,9 @@ class MusicCog(commands.Cog):
                             self.current_voice_channel = await self.current_voice_channel.disconnect()
                             self.current_voice_channel = await self.music_queue[0][1].connect()
                         connected = True
-                except Exception:
+                except Exception as e:
                     print("Algo salio mal al conectar al bot.")
+                    print(e)
                     break
 
         else: # The join command will join the bot to the voice channel
