@@ -232,7 +232,7 @@ class MusicCog(commands.Cog):
             elif results.get("error"):
                 error_reason = results["error"].get("errors")[0].get("reason")
                 if error_reason == "playlistNotFound":
-                    await context.send("Mae la playlist de Youtube está como privada. Pruebe cambiandola a Unlisted o Public")
+                    await context.send("Mae la playlist de Youtube está como privada. Pruebe cambiandola a Unlisted o Public.")
                     break
             else:
                 await context.send("Mae la playlist de Youtube está vacia.")
@@ -287,7 +287,7 @@ class MusicCog(commands.Cog):
             while connected == False:
                 try:
                     self.current_voice_channel = await asyncio.shield(self.music_queue[0][1].connect())
-                    if self.current_voice_channel.is_connected():
+                    if self.current_voice_channel.is_connected() and self.music_queue[0][1]:
                         if self.current_voice_channel.channel.name != self.music_queue[0][1].name:
                         # If the bot is connected but not in the same voice channel as you,
                         # move to that channel.
@@ -295,20 +295,22 @@ class MusicCog(commands.Cog):
                             self.current_voice_channel = await self.music_queue[0][1].connect()
                         connected = True
                 except Exception as e:
-                    print("Algo salio mal al conectar al bot.")
-                    print(e)
+                    print(f"Algo salio mal al conectar al bot: {e}.")
                     break
 
         else: # The join command will join the bot to the voice channel
-            if not self.current_voice_channel:
-                self.current_voice_channel = await asyncio.shield(voice_channel_to_connect.connect())
+            try:
+                if not self.current_voice_channel:
+                    self.current_voice_channel = await asyncio.shield(voice_channel_to_connect.connect())
 
-            elif self.current_voice_channel and self.current_voice_channel.is_connected():
-                if self.current_voice_channel.channel.name != voice_channel_to_connect.name:
-                    # If the bot is connected but not in the same voice channel as you,
-                    # move to that channel.
-                    self.current_voice_channel = await self.current_voice_channel.disconnect()
-                    self.current_voice_channel = await voice_channel_to_connect.connect()
+                elif self.current_voice_channel and self.current_voice_channel.is_connected():
+                    if self.current_voice_channel.channel.name != voice_channel_to_connect.name:
+                        # If the bot is connected but not in the same voice channel as you,
+                        # move to that channel.
+                        self.current_voice_channel = await self.current_voice_channel.disconnect()
+                        self.current_voice_channel = await voice_channel_to_connect.connect()
+            except Exception as e:
+                print(f"Algo salio mal al usar el comando 'join' para conectar al bot: {e}.")
 
 
     def _play_next(self):
@@ -435,7 +437,7 @@ class MusicCog(commands.Cog):
                     for songs_added, video in enumerate(playlist_info):
                         self.music_queue.append([video, voice_channel])
                         if songs_added == 1:
-                            if self.is_playing == False and self.is_paused == False:
+                            if self.is_playing is False and self.is_paused is False:
                                 # Try to connect to a voice channel if you are not already connected
                                 await self._try_to_connect()
                                 self._play_next()
@@ -465,7 +467,6 @@ class MusicCog(commands.Cog):
         Params:
             * context: Represents the context in which a command is being invoked under.
         """
-        #TODO: NEED TO THINK HOW TO MODIFY THIS TO WORK WITH THE NEW WAY OF PROCESSING PLAYLISTS AND QUEUE MUSIC
         if await self._check_self_bot(context):
             if len(self.music_queue) > 0:
                 current = 0 # Current embed being displayed
@@ -496,7 +497,7 @@ class MusicCog(commands.Cog):
                             author=self.music_queue[embed_songs][0]["author"]
                         )
                         if next_song_info: 
-                            # If by using youtubedl to download the info of the song did
+                            # If by using youtubedl to download the info of the song did work
                             self.music_queue[embed_songs][0] = next_song_info
                             queue_display_list[embed_songs][0] = next_song_info
                             title = next_song_info["title"]
