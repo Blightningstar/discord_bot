@@ -1,11 +1,13 @@
 import discord
 import os
 import re
+import django
 import asyncio
 import numpy as np
 import json, requests
 from discord.ext import commands
 from youtube_dl import YoutubeDL
+from asgiref.sync import sync_to_async
 from googleapiclient.discovery import build
 from datetime import timedelta
 
@@ -13,6 +15,9 @@ if os.getenv("DJANGO_ENV") == "PROD":
     from discord_bot.settings.production import BOT_NAME
 elif os.getenv("DJANGO_ENV") == "DEV":
     from discord_bot.settings.dev import BOT_NAME
+
+django.setup()    
+from .models import SongLog
 
 from .music_commands import (
     PLAY_COMMAND_ALIASES, QUEUE_COMMAND_ALIASES, 
@@ -197,6 +202,15 @@ class MusicCog(commands.Cog):
 
         return duration_in_seconds
 
+    @sync_to_async
+    def save_song(self, url, title, duration, thumbnail):
+        SongLog(
+            url=url,
+            title=title,
+            duration=duration,
+            thumbnail=thumbnail
+        ).save()
+
     async def _search_youtube_playlist(self, url, context):
         """
         Util method that takes care of fetching necessary info from a youtube url or item
@@ -246,17 +260,31 @@ class MusicCog(commands.Cog):
             )
             video_response = videos_request.execute()
             items = video_response.get("items", None)
+
+            url = f"https://youtu.be/{video_id}"
+
             if items:
                 content_details = items[0].get("contentDetails")
                 snippet = items[0].get("snippet")
                 duration = content_details.get("duration")
 
+                title = snippet.get("title")
+                duration = self._format_youtube_duration(duration)
+                thumbnail = snippet.get("thumbnails").get("default").get("url")
+
+                await self.save_song(
+                    url=url,
+                    title=title,
+                    duration=duration,
+                    thumbnail=thumbnail
+                )
+                
                 video_info = {
                     "source": "",
-                    "title": snippet.get("title"), 
-                    "duration": self._format_youtube_duration(duration), 
-                    "thumbnail": snippet.get("thumbnails").get("default").get("url"),
-                    "url": f"https://youtu.be/{video_id}",
+                    "title": title, 
+                    "duration": duration, 
+                    "thumbnail": thumbnail,
+                    "url": url,
                     "author": context.author.nick
                 }
             else:
@@ -265,7 +293,7 @@ class MusicCog(commands.Cog):
                     "title": "",
                     "duration": "",
                     "thumbnail": "",
-                    "url": f"https://youtu.be/{video_id}",
+                    "url": url,
                     "author": context.author.nick
                 }
             relevant_data.append(video_info)
