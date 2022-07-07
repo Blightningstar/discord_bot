@@ -1,11 +1,13 @@
 import discord
 import os
 import re
+import django
 import asyncio
 import numpy as np
 import json, requests
 from discord.ext import commands
 from youtube_dl import YoutubeDL
+from asgiref.sync import sync_to_async
 from googleapiclient.discovery import build
 from datetime import timedelta
 
@@ -13,6 +15,9 @@ if os.getenv("DJANGO_ENV") == "PROD":
     from discord_bot.settings.production import BOT_NAME
 elif os.getenv("DJANGO_ENV") == "DEV":
     from discord_bot.settings.dev import BOT_NAME
+
+django.setup()    
+from .models import SongLog
 
 from .music_commands import (
     PLAY_COMMAND_ALIASES, QUEUE_COMMAND_ALIASES, 
@@ -140,6 +145,30 @@ class MusicCog(commands.Cog):
             return False
         return True
 
+    @sync_to_async
+    def _save_song(self, url, title, duration, thumbnail):
+        """
+        Save an entry with the downloaded song info, this way we don't have to download
+        each new song in the future.
+        """
+        SongLog(
+            url=url,
+            title=title,
+            duration=duration,
+            thumbnail=thumbnail
+        ).save()
+
+    @sync_to_async
+    def _retrieve_song(self, url):
+        """
+        Return all the data from a song with its unique url
+        """
+        data = []
+        queryset = SongLog.objects.filter(url=url)
+        # print(queryset)
+        if queryset:
+            data = list(queryset)[0]
+        return data
 
     def _search_youtube_url(self, item, author):
         """
@@ -159,12 +188,18 @@ class MusicCog(commands.Cog):
                 info = ydl.extract_info(f"ytsearch:{item}", download=False)["entries"][0]
             except Exception:
                 return False
+
+        url = info["webpage_url"]
+        title = info["title"]
+        duration = info["duration"]
+        thumbnail = info["thumbnail"]
+
         return {
             "source": info["formats"][0]["url"], 
-            "title": info["title"], 
-            "duration": info["duration"], 
-            "thumbnail": info["thumbnail"],
-            "url": info["webpage_url"],
+            "title": title, 
+            "duration": duration, 
+            "thumbnail": thumbnail,
+            "url": url,
             "author": author
         }
 
@@ -240,34 +275,54 @@ class MusicCog(commands.Cog):
 
 
         for video_id in video_list:
-            videos_request = self.youtube.videos().list(
-                part="contentDetails, snippet",
-                id=video_id
-            )
-            video_response = videos_request.execute()
-            items = video_response.get("items", None)
-            if items:
-                content_details = items[0].get("contentDetails")
-                snippet = items[0].get("snippet")
-                duration = content_details.get("duration")
-
+            # TODO: Maybe instead of searching each item, now that in this point we have
+            # the videos ids we can query the db and fetch the data from there
+            url = f"https://youtu.be/{video_id}"
+            song_log_data = await self._retrieve_song(url=url)
+            if song_log_data:
+                # If we have the song in our database
                 video_info = {
                     "source": "",
-                    "title": snippet.get("title"), 
-                    "duration": self._format_youtube_duration(duration), 
-                    "thumbnail": snippet.get("thumbnails").get("default").get("url"),
-                    "url": f"https://youtu.be/{video_id}",
+                    "title": song_log_data.title, 
+                    "duration": song_log_data.duration, 
+                    "thumbnail": song_log_data.thumbnail,
+                    "url": url,
                     "author": context.author.nick
                 }
             else:
-                video_info = {
-                    "source": "",
-                    "title": "",
-                    "duration": "",
-                    "thumbnail": "",
-                    "url": f"https://youtu.be/{video_id}",
-                    "author": context.author.nick
-                }
+                # We don't have the song in our database so we'll fetch and save the info
+                videos_request = self.youtube.videos().list(
+                    part="contentDetails, snippet",
+                    id=video_id
+                )
+                video_response = videos_request.execute()
+                items = video_response.get("items", None)
+
+                if items:
+                    content_details = items[0].get("contentDetails")
+                    snippet = items[0].get("snippet")
+                    duration = content_details.get("duration")
+
+                    title = snippet.get("title")
+                    duration = self._format_youtube_duration(duration)
+                    thumbnail = snippet.get("thumbnails").get("default").get("url")
+
+                    await self._save_song(
+                        url=url,
+                        title=title,
+                        duration=duration,
+                        thumbnail=thumbnail
+                    )
+                    
+                    video_info = {
+                        "source": "",
+                        "title": title, 
+                        "duration": duration, 
+                        "thumbnail": thumbnail,
+                        "url": url,
+                        "author": context.author.nick
+                    }
+
             relevant_data.append(video_info)
 
         return relevant_data
@@ -450,6 +505,12 @@ class MusicCog(commands.Cog):
                     # reproduce a playlist or livestream. Search later if this can be avoided.
                     await context.send("Mae no se pudo descargar la canción.")
                 else:
+                    await self._save_song(
+                        url=song_info["url"],
+                        title=song_info["title"],
+                        duration=song_info["duration"],
+                        thumbnail=song_info["thumbnail"]
+                    )
                     self.music_queue.append([song_info, voice_channel])
                     await context.send("Canción añadida a la colaヾ(•ω•`)o")
 
@@ -490,14 +551,18 @@ class MusicCog(commands.Cog):
                     next_song_info = ""
                     song_info = queue_display_list[embed_songs][0]
                     if song_info["title"] == "" or song_info["duration"] == "":
-                        # This means Youtube Data API couldn't retrieve the information for the song.
-                        # So we need to fetch it to be able to display it in the queue
-                        next_song_info = self._search_youtube_url(
-                            item=self.music_queue[embed_songs][0]["url"],
-                            author=self.music_queue[embed_songs][0]["author"]
-                        )
+                        # This means Youtube Data API couldn't or hasn't retrieved the information 
+                        # for the song. So we need to fetch it to be able to display it in the queue
+                        next_song_info = await self._retrieve_song(url=self.music_queue[embed_songs][0]["url"])
+                        if not next_song_info: 
+                            # If retriving the info from our db didn't work
+                            next_song_info = self._search_youtube_url(
+                                item=self.music_queue[embed_songs][0]["url"],
+                                author=self.music_queue[embed_songs][0]["author"]
+                            )
+
                         if next_song_info: 
-                            # If by using youtubedl to download the info of the song did work
+                            # If retriving the info from our db worked
                             self.music_queue[embed_songs][0] = next_song_info
                             queue_display_list[embed_songs][0] = next_song_info
                             title = next_song_info["title"]
@@ -505,11 +570,12 @@ class MusicCog(commands.Cog):
                             duration = next_song_info["duration"]
                             author = next_song_info["author"]
                         else:
-                            # If by using youtubedl to download the info of the song didn't
-                            # work then we can't play it, so let's remove it from the queue
+                            # We exhausted our possibilities so we can't play it and
+                            # should remove it from the queue
                             self.music_queue.pop(embed_songs)
 
                     else:
+                        # This means we have the information of the song so let's just add it
                         title = queue_display_list[embed_songs][0]["title"]
                         url = queue_display_list[embed_songs][0]["url"]
                         duration = queue_display_list[embed_songs][0]["duration"]
