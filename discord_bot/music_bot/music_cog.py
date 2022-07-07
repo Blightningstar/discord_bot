@@ -163,9 +163,11 @@ class MusicCog(commands.Cog):
         """
         Return all the data from a song with its unique url
         """
+        data = []
         queryset = SongLog.objects.filter(url=url)
         print(queryset)
-        data = list(queryset)
+        if queryset:
+            data = list(queryset)[0]
         return data
 
     def _search_youtube_url(self, item, author):
@@ -273,48 +275,54 @@ class MusicCog(commands.Cog):
 
 
         for video_id in video_list:
-            videos_request = self.youtube.videos().list(
-                part="contentDetails, snippet",
-                id=video_id
-            )
-            video_response = videos_request.execute()
-            items = video_response.get("items", None)
-
+            # TODO: Maybe instead of searching each item, now that in this point we have
+            # the videos ids we can query the db and fetch the data from there
             url = f"https://youtu.be/{video_id}"
-
-            if items:
-                content_details = items[0].get("contentDetails")
-                snippet = items[0].get("snippet")
-                duration = content_details.get("duration")
-
-                title = snippet.get("title")
-                duration = self._format_youtube_duration(duration)
-                thumbnail = snippet.get("thumbnails").get("default").get("url")
-
-                await self._save_song(
-                    url=url,
-                    title=title,
-                    duration=duration,
-                    thumbnail=thumbnail
-                )
-                
+            song_log_data = await self._retrieve_song(url=url)
+            if song_log_data:
+                # If we have the song in our database
                 video_info = {
                     "source": "",
-                    "title": title, 
-                    "duration": duration, 
-                    "thumbnail": thumbnail,
+                    "title": song_log_data.title, 
+                    "duration": song_log_data.duration, 
+                    "thumbnail": song_log_data.thumbnail,
                     "url": url,
                     "author": context.author.nick
                 }
             else:
-                video_info = {
-                    "source": "",
-                    "title": "",
-                    "duration": "",
-                    "thumbnail": "",
-                    "url": url,
-                    "author": context.author.nick
-                }
+                # We don't have the song in our database so we'll fetch and save the info
+                videos_request = self.youtube.videos().list(
+                    part="contentDetails, snippet",
+                    id=video_id
+                )
+                video_response = videos_request.execute()
+                items = video_response.get("items", None)
+
+                if items:
+                    content_details = items[0].get("contentDetails")
+                    snippet = items[0].get("snippet")
+                    duration = content_details.get("duration")
+
+                    title = snippet.get("title")
+                    duration = self._format_youtube_duration(duration)
+                    thumbnail = snippet.get("thumbnails").get("default").get("url")
+
+                    await self._save_song(
+                        url=url,
+                        title=title,
+                        duration=duration,
+                        thumbnail=thumbnail
+                    )
+                    
+                    video_info = {
+                        "source": "",
+                        "title": title, 
+                        "duration": duration, 
+                        "thumbnail": thumbnail,
+                        "url": url,
+                        "author": context.author.nick
+                    }
+
             relevant_data.append(video_info)
 
         return relevant_data
