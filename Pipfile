@@ -19,6 +19,7 @@ youtube-dl = "*"
 gunicorn = "*"
 whitenoise = "*"
 google-api-python-client = "*"
+pillow = "*"
 
 [dev-packages]
 
