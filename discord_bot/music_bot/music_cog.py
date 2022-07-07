@@ -386,13 +386,16 @@ class MusicCog(commands.Cog):
 
                 # Get the first url
                 if self.music_queue[0][0].get("source") == "":
+                    next_song_player = ""
                     next_song_info = self._search_youtube_url(
                         item=self.music_queue[0][0]["url"],
                         author=self.music_queue[0][0]["author"]
                     )
-                    next_song_url = next_song_info["source"]
+                    if next_song_info:
+                        next_song_player = next_song_info["source"]
+
                 else:
-                    next_song_url = self.music_queue[0][0]["source"]
+                    next_song_player = self.music_queue[0][0]["source"]
                 
                 # Remove the first element of the queue as we will be playing it
                 # Add that element to the now_playing array if this information
@@ -410,9 +413,12 @@ class MusicCog(commands.Cog):
                 # The Voice Channel we are currently on will start playing the next song
                 # Once that song is over "after=lambda e: self._play_next()" will play the 
                 # next song if it there is another one queued.
-                self.current_voice_channel.play(discord.FFmpegPCMAudio(next_song_url, **self.FFMPEG_OPTIONS ), after=lambda e: self._play_next())
-                self.current_voice_channel.source = discord.PCMVolumeTransformer(self.current_voice_channel.source)
-                self.current_voice_channel.source.volume = 0.7
+                if next_song_player:
+                    self.current_voice_channel.play(discord.FFmpegPCMAudio(next_song_player, **self.FFMPEG_OPTIONS ), after=lambda e: self._play_next())
+                    self.current_voice_channel.source = discord.PCMVolumeTransformer(self.current_voice_channel.source)
+                    self.current_voice_channel.source.volume = 0.7
+                else:
+                    self._play_next()
 
             except Exception as e:
                 print(e)
