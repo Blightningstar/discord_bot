@@ -165,7 +165,7 @@ class MusicCog(commands.Cog):
         """
         data = []
         queryset = SongLog.objects.filter(url=url)
-        print(queryset)
+        # print(queryset)
         if queryset:
             data = list(queryset)[0]
         return data
