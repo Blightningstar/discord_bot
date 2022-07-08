@@ -262,7 +262,7 @@ class MusicCog(commands.Cog):
                 if "nextPageToken" in results:
                     next_page = results["nextPageToken"]
                 else:
-                    print(f"No. of videos: {video_count}")
+                    # print(f"No. of videos: {video_count}")
                     break
             elif results.get("error"):
                 error_reason = results["error"].get("errors")[0].get("reason")
@@ -414,9 +414,13 @@ class MusicCog(commands.Cog):
                 # Once that song is over "after=lambda e: self._play_next()" will play the 
                 # next song if it there is another one queued.
                 if next_song_player:
-                    self.current_voice_channel.play(discord.FFmpegPCMAudio(next_song_player, **self.FFMPEG_OPTIONS ), after=lambda e: self._play_next())
-                    self.current_voice_channel.source = discord.PCMVolumeTransformer(self.current_voice_channel.source)
-                    self.current_voice_channel.source.volume = 0.7
+                    try:
+                        self.current_voice_channel.play(discord.FFmpegPCMAudio(next_song_player, **self.FFMPEG_OPTIONS ), after=lambda e: self._play_next())
+                        self.current_voice_channel.source = discord.PCMVolumeTransformer(self.current_voice_channel.source)
+                        self.current_voice_channel.source.volume = 10.0
+                    except Exception as e:
+                        print(e)
+                        self._play_next()
                 else:
                     self._play_next()
 
