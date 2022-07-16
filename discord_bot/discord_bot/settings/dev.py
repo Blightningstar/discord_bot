@@ -5,6 +5,7 @@ DEBUG = True
 ALLOWED_HOSTS = ["localhost","0.0.0.0",".ngrok.io"]
 
 BOT_NAME = "Marbotest"
+MUSIC_CHANNEL = 894034318089920542
 
 DATABASES = {
     "default": {
