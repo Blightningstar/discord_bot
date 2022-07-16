@@ -419,7 +419,7 @@ class MusicCog(commands.Cog):
                         self.current_voice_channel.source = discord.PCMVolumeTransformer(self.current_voice_channel.source)
                         self.current_voice_channel.source.volume = 10.0
                     except Exception as e:
-                        print(e)
+                        print("Error with FFmpeg: "+e)
                         self._play_next()
                 else:
                     self._play_next()
@@ -708,7 +708,7 @@ class MusicCog(commands.Cog):
                 np.random.shuffle(numpy_array)
                 self.shuffled_music_queue = numpy_array.tolist()
                 self.is_queue_shuffled = True
-                await context.send("La cola hizo brrr c:")
+                await context.send("Le hiciste brrrr a esa cola c:")
             else:
                await context.send("La cola no tiene canciones actualmente :c")
 
