@@ -417,7 +417,7 @@ class MusicCog(commands.Cog):
                     try:
                         self.current_voice_channel.play(discord.FFmpegPCMAudio(next_song_player, **self.FFMPEG_OPTIONS ), after=lambda e: self._play_next())
                         self.current_voice_channel.source = discord.PCMVolumeTransformer(self.current_voice_channel.source)
-                        self.current_voice_channel.source.volume = 10.0
+                        self.current_voice_channel.source.volume = 7.0
                     except Exception as e:
                         print("Error with FFmpeg: "+e)
                         self._play_next()
@@ -494,10 +494,10 @@ class MusicCog(commands.Cog):
             youtube_query = self._clean_youtube_query(youtube_query=youtube_query)
 
             if is_playlist:
-
+                await context.send("Procesando la playlist...")
                 playlist_info = await self._search_youtube_playlist(youtube_query, context)
                 if not playlist_info: 
-                    await context.send("Mae no se pudo poner la playlist.")
+                    await context.send("Mae no se pudo poner la playlist!")
                 else:
                     for songs_added, video in enumerate(playlist_info):
                         self.music_queue.append([video, voice_channel])
