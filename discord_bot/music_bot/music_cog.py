@@ -350,7 +350,7 @@ class MusicCog(commands.Cog):
                             self.current_voice_channel = await self.music_queue[0][1].connect()
                         connected = True
                 except Exception as e:
-                    print(f"Algo salio mal al conectar al bot: {e}.")
+                    print(f"Algo salio mal al conectar al bot: {str(e)}.")
                     break
 
         else: # The join command will join the bot to the voice channel
@@ -365,7 +365,7 @@ class MusicCog(commands.Cog):
                         self.current_voice_channel = await self.current_voice_channel.disconnect()
                         self.current_voice_channel = await voice_channel_to_connect.connect()
             except Exception as e:
-                print(f"Algo salio mal al usar el comando 'join' para conectar al bot: {e}.")
+                print(f"Algo salio mal al usar el comando 'join' para conectar al bot: {str(e)}.")
 
 
     def _play_next(self):
@@ -419,13 +419,13 @@ class MusicCog(commands.Cog):
                         self.current_voice_channel.source = discord.PCMVolumeTransformer(self.current_voice_channel.source)
                         self.current_voice_channel.source.volume = 7.0
                     except Exception as e:
-                        print("Error with FFmpeg: "+e)
+                        print("Error with FFmpeg: "+str(e))
                         self._play_next()
                 else:
                     self._play_next()
 
             except Exception as e:
-                print(e)
+                print(str(e))
                 self.is_playing = False
         else:
             self.is_playing = False
