@@ -417,7 +417,7 @@ class MusicCog(commands.Cog):
                     try:
                         self.current_voice_channel.play(discord.FFmpegPCMAudio(next_song_player, **self.FFMPEG_OPTIONS ), after=lambda e: self._play_next())
                         self.current_voice_channel.source = discord.PCMVolumeTransformer(self.current_voice_channel.source)
-                        self.current_voice_channel.source.volume = 7.0
+                        self.current_voice_channel.source.volume = 3.0
                     except Exception as e:
                         print("Error with FFmpeg: "+str(e))
                         self._play_next()
