@@ -3,6 +3,7 @@ import os
 import re
 import django
 import asyncio
+import validators
 import numpy as np
 import json, requests
 from discord.ext import commands
@@ -25,7 +26,7 @@ from .music_commands import (
     NOW_PLAYING_COMMAND_ALIASES, JOIN_COMMAND_ALIASES,
     PAUSE_COMMAND_ALIASES, RESUME_COMMAND_ALIASES,
     MOVE_COMMAND_ALIASES, HELP_COMMAND_ALIASES,
-    DISCONNECT_COMMAND_ALIASES
+    DISCONNECT_COMMAND_ALIASES, PLAY_NEXT_COMMAND_ALIASES
 )
 
 class MusicCog(commands.Cog):
@@ -140,6 +141,7 @@ class MusicCog(commands.Cog):
         acepted_commands = ["play", "disconnect"]
         acepted_commands.extend(PLAY_COMMAND_ALIASES)
         acepted_commands.extend(DISCONNECT_COMMAND_ALIASES)
+        acepted_commands.extend(PLAY_NEXT_COMMAND_ALIASES)
         if not self.current_voice_channel and command not in acepted_commands:
             await context.send(f"Mae el {BOT_NAME} no esta en ningun canal de voz.")
             return False
@@ -275,8 +277,6 @@ class MusicCog(commands.Cog):
 
 
         for video_id in video_list:
-            # TODO: Maybe instead of searching each item, now that in this point we have
-            # the videos ids we can query the db and fetch the data from there
             url = f"https://youtu.be/{video_id}"
             song_log_data = await self._retrieve_song(url=url)
             if song_log_data:
@@ -368,7 +368,7 @@ class MusicCog(commands.Cog):
                 print(f"Algo salio mal al usar el comando 'join' para conectar al bot: {str(e)}.")
 
 
-    def _play_next(self):
+    def _reproduce_next_song_in_queue(self):
         """
         Util method that takes care of recursively playing the queue until it's empty.
         Params:
@@ -411,18 +411,18 @@ class MusicCog(commands.Cog):
                     self.now_playing.append(self.music_queue.pop(0)[0])
 
                 # The Voice Channel we are currently on will start playing the next song
-                # Once that song is over "after=lambda e: self._play_next()" will play the 
+                # Once that song is over "after=lambda e: self._reproduce_next_song_in_queue()" will play the 
                 # next song if it there is another one queued.
                 if next_song_player:
                     try:
-                        self.current_voice_channel.play(discord.FFmpegPCMAudio(next_song_player, **self.FFMPEG_OPTIONS ), after=lambda e: self._play_next())
+                        self.current_voice_channel.play(discord.FFmpegPCMAudio(next_song_player, **self.FFMPEG_OPTIONS ), after=lambda e: self._reproduce_next_song_in_queue())
                         self.current_voice_channel.source = discord.PCMVolumeTransformer(self.current_voice_channel.source)
                         self.current_voice_channel.source.volume = 3.0
                     except Exception as e:
                         print("Error with FFmpeg: "+str(e))
-                        self._play_next()
+                        self._reproduce_next_song_in_queue()
                 else:
-                    self._play_next()
+                    self._reproduce_next_song_in_queue()
 
             except Exception as e:
                 print(str(e))
@@ -470,6 +470,21 @@ class MusicCog(commands.Cog):
             return youtube_query.split("&t=")[0]
         return youtube_query
 
+    def _is_youtube_playlist(self, youtube_query):
+        """
+        Checks if a youtube query is an url and if so
+        if it is list.
+        params:
+            * youtube_query: Youtube url or query to play.
+        """
+        is_playlist = False
+        if validators.url(youtube_query):
+            if "list" in youtube_query:
+                # This means it is a playlist
+                is_playlist = True
+        return is_playlist
+        
+
     ################################################################### COMMANDS METHODS #########################################################
 
     @commands.command(aliases=PLAY_COMMAND_ALIASES)
@@ -484,18 +499,15 @@ class MusicCog(commands.Cog):
         """
         if await self._check_self_bot(context):
             youtube_query = " ".join(args)
-            is_playlist = False
             voice_channel = context.author.voice.channel
-
-            if "list" in youtube_query:
-                # This means it is a playlist
-                is_playlist = True
+            author_of_command = context.author.name
 
             youtube_query = self._clean_youtube_query(youtube_query=youtube_query)
+            is_playlist = self._is_youtube_playlist(youtube_query=youtube_query)
 
             if is_playlist:
                 await context.send("Procesando la playlist...")
-                playlist_info = await self._search_youtube_playlist(youtube_query, context)
+                playlist_info = await self._search_youtube_playlist(url=youtube_query, context=context)
                 if not playlist_info: 
                     await context.send("Mae no se pudo poner la playlist!")
                 else:
@@ -505,11 +517,11 @@ class MusicCog(commands.Cog):
                             if self.is_playing is False and self.is_paused is False:
                                 # Try to connect to a voice channel if you are not already connected
                                 await self._try_to_connect()
-                                self._play_next()
+                                self._reproduce_next_song_in_queue()
 
                     await context.send(f"{songs_added} canciones añadidas a la colaヾ(•ω•`)o")
             else:    
-                song_info = self._search_youtube_url(youtube_query, context.author.nick)
+                song_info = self._search_youtube_url(item=youtube_query, author=author_of_command)
                 if not song_info: 
                     # This was done for the exception that _search_youtube_url can throw if you try to
                     # reproduce a playlist or livestream. Search later if this can be avoided.
@@ -527,7 +539,7 @@ class MusicCog(commands.Cog):
             if self.is_playing == False and self.is_paused == False:
                 # Try to connect to a voice channel if you are not already connected
                 await self._try_to_connect()
-                self._play_next()
+                self._reproduce_next_song_in_queue()
 
 
     @commands.command(aliases=QUEUE_COMMAND_ALIASES)
@@ -593,7 +605,7 @@ class MusicCog(commands.Cog):
 
                     embed_message = f"`{queue_display_msg}{str(embed_songs+1)} -` [{title}]({url})|`{self._convert_seconds(duration)} ({author})`\n"
 
-                    if len(embed_message) < 1024: # TODO NEED TO MAKE THIS ONLY LOAD 
+                    if len(embed_message) < 1024:
                         # This means we reached the maximun that an embed field can handle.
                         if embed_songs < len(queue_display_list):
                             # If we haven't reached the end of the music_queue
@@ -686,7 +698,7 @@ class MusicCog(commands.Cog):
         if await self._check_self_bot(context):
             if self.current_voice_channel: 
                 if self.current_voice_channel.is_playing():
-                    # This will trigger the lambda e function from _play_next method to jump to the next song in queue
+                    # This will trigger the lambda e function from _reproduce_next_song_in_queue method to jump to the next song in queue
                     self.current_voice_channel.stop()
                 else:
                     await context.send(f"{BOT_NAME} no esta tocando ninguna canción.")  
@@ -864,3 +876,41 @@ class MusicCog(commands.Cog):
                     self.now_playing = []
             else:
                 await context.send(f"El {BOT_NAME} no está conectado a un canal de voz.")
+
+    @commands.command(aliases=PLAY_NEXT_COMMAND_ALIASES)
+    @commands.check(_check_if_valid)
+    async def play_next(self, context, *args):
+        """
+        Command to add a song at the beginning of the music queue.
+        Params:
+            * context: Represents the context in which a command is being invoked under.
+        """
+        if await self._check_self_bot(context):
+            if len(self.music_queue) > 0:
+                youtube_query = " ".join(args)
+                voice_channel = context.author.voice.channel
+                author_of_command = context.author.name
+
+                youtube_query = self._clean_youtube_query(youtube_query=youtube_query)
+                is_playlist = self._is_youtube_playlist(youtube_query=youtube_query)
+
+                if not is_playlist:
+                    song_info = self._search_youtube_url(item=youtube_query, author=author_of_command)
+                    if not song_info: 
+                        # This was done for the exception that _search_youtube_url can throw if you try to
+                        # reproduce a playlist or livestream. Search later if this can be avoided.
+                        await context.send("Mae no se pudo descargar la canción.")
+                    else:
+                        await self._save_song(
+                            url=song_info["url"],
+                            title=song_info["title"],
+                            duration=song_info["duration"],
+                            thumbnail=song_info["thumbnail"]
+                        )
+                        self.music_queue.insert(0, [song_info, voice_channel])
+                        await context.send("Canción añadida al inicio de la colaヾ(•ω•`)o")
+                else:
+                    await context.send(f"Este comando no procesa listas, para eso use el comando play.")
+            else:
+                # If there is no queue, this means we can execute the play command just normal
+                await self.play(context, *args)
