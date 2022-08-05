@@ -5,7 +5,7 @@ PLAY_COMMAND_ALIASES = ["rolela","r", "p"]
 QUEUE_COMMAND_ALIASES = ["cola","c","q"]
 
 ############################### Skip Command
-SKIP_COMMAND_ALIASES = ["saltela","s"]
+SKIP_COMMAND_ALIASES = ["saltela","s", "siguiente"]
 
 ############################### Shuffle Command
 SHUFFLE_COMMAND_ALIASES = ["barajela", "b"]
@@ -30,3 +30,6 @@ HELP_COMMAND_ALIASES = ["h", "commands", "ayuda", "comandos", "info", "aiuda", "
 
 ############################### Disconnect Command
 DISCONNECT_COMMAND_ALIASES = ["jale","desconectar", "apagar"]
+
+############################### Play Next Command
+PLAY_NEXT_COMMAND_ALIASES = ["pn", "n"]
