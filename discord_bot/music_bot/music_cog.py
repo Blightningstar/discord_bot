@@ -466,9 +466,10 @@ class MusicCog(commands.Cog):
             * youtube_query: Youtube url to play.
         """
         # Clean videos with a timestamp, avoids request failing
-        if "&t=" in youtube_query:
-            return youtube_query.split("&t=")[0]
-        return youtube_query
+        if validators.url(youtube_query):
+            if "&t=" in youtube_query:
+                return youtube_query.split("&t=")[0]
+            return youtube_query
 
     def _is_youtube_playlist(self, youtube_query):
         """
