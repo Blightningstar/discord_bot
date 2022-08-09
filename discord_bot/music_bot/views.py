@@ -5,7 +5,7 @@ from .music_commands import (
     JOIN_COMMAND_ALIASES, SKIP_COMMAND_ALIASES,
     PAUSE_COMMAND_ALIASES, RESUME_COMMAND_ALIASES,
     SHUFFLE_COMMAND_ALIASES, HELP_COMMAND_ALIASES,
-    DISCONNECT_COMMAND_ALIASES
+    DISCONNECT_COMMAND_ALIASES, PLAY_NEXT_COMMAND_ALIASES
 )
 
 def music_commands_views(request):
@@ -51,3 +51,7 @@ def resume_view(request):
 def shuffle_view(request):
     context = {"command_aliases": SHUFFLE_COMMAND_ALIASES, "base_command":"shuffle"}
     return render(request, "music_bot/shuffle.html", context=context)
+
+def play_next_view(request):
+    context = {"command_aliases": PLAY_NEXT_COMMAND_ALIASES, "base_command":"play_next"}
+    return render(request, "music_bot/play_next.html", context=context)

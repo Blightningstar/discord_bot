@@ -2,7 +2,7 @@ from .views import (
     music_commands_views, pause_view, play_view, 
     now_playing_view, move_view, 
     queue_view, join_view, skip_view, 
-    resume_view, shuffle_view, disconnect_view
+    resume_view, shuffle_view, disconnect_view, play_next_view
 )
 from django.urls import path
 
@@ -18,4 +18,5 @@ urlpatterns = [
     path("commands_help/pause", pause_view, name="commands-pause"),
     path("commands_help/resume", resume_view, name="commands-resume"),
     path("commands_help/shuffle", shuffle_view, name="commands-shuffle"),
+    path("commands_help/play_next", play_next_view, name="commands-play-next"),
 ]
