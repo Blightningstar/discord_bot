@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% load static%}
+
+{% block title %} Music Bot Commands {% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="col">
+        <h1 class="mt-4">Play Next</h1>
+        <hr>
+        <p>
+            Añade una canción al inicio de la cola. Si no hay cola se ejecuta el comando de play en vez.
+        </p>
+        <div class="alert alert-info">
+            <h5><b>Notas:</b></h5>
+            <p>
+                Este comando no ejecuta playlists de youtube! Para eso utilice el comando 
+                <a href="{% url 'commands-play' %}">
+                    <strong class="mb-1">play</strong>
+                </a>
+            </p>
+        </div>
+        <p> 
+            Estos son los distintos comandos que pueden utilizar:
+            <ul>
+                {% for command in command_aliases %}
+                    <li><b>{{ command }}</b></li>
+                {% endfor %}
+                <li><b>{{ base_command }}</b></li>
+            </ul>
+        </p>
+        <table class="table table-bordered">
+            <thead class="thead-dark">
+              <tr>
+                <th scope="col">Comandos</th>
+                <th scope="col">Ejemplos</th>
+              </tr>
+            </thead>
+                <tbody>
+                    {% for command in command_aliases %}
+                    <tr>
+                        <td>
+                            <b>{{ command }}</b> nombre de la canción o url de la canción
+                        </td>
+                        <td>
+                            {{ command }} macarena
+                            <hr>
+                            {{ command }} https://www.youtube.com/watch?v=zWaymcVmJ-A
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    <tr>
+                        <td>
+                            <b>{{ base_command }}</b> nombre de la canción o url de la canción
+                        </td>
+                        <td>
+                            {{ base_command }} macarena
+                            <hr>
+                            {{ base_command }} https://www.youtube.com/watch?v=zWaymcVmJ-A
+                        </td>
+                    </tr>
+                </tbody>
+          </table>
+    </div>
+</div>
+{% endblock %}
