@@ -5,7 +5,6 @@ DEBUG = False
 ALLOWED_HOSTS = [".herokuapp.com"]
 
 BOT_NAME = "Marbot"
-MUSIC_CHANNEL = 775506848794804230
 
 DATABASES = {
     "default": {

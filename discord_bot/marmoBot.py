@@ -5,9 +5,9 @@ from music_bot.music_cog import MusicCog
 from halloween_bot.halloween_cog import HalloweenCog
 
 if os.getenv("DJANGO_ENV") == "PROD":
-    from discord_bot.settings.production import BOT_NAME, MUSIC_CHANNEL
+    from discord_bot.settings.production import BOT_NAME
 elif os.getenv("DJANGO_ENV") == "DEV":
-    from discord_bot.settings.dev import BOT_NAME, MUSIC_CHANNEL
+    from discord_bot.settings.dev import BOT_NAME
 
 bot = commands.Bot(command_prefix="")
 
@@ -18,7 +18,13 @@ bot.add_cog(HalloweenCog(bot))
 async def on_ready():
     message = BOT_NAME + " ha despertado!"
     print(message)
-    channel = bot.get_channel(MUSIC_CHANNEL)
+    
+    music_channel = os.getenv("MUSIC_CHANNEL")
+
+    if not isinstance(music_channel,int):
+        music_channel = int(music_channel)
+
+    channel = bot.get_channel(music_channel)
     if channel:
         await channel.send(message)
 

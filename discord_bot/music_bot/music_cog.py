@@ -91,13 +91,9 @@ class MusicCog(commands.Cog):
         Returns:
             * If the command is valid
         """
-        if os.getenv("DJANGO_ENV") == "PROD":
-            accepted_channel = "music"
-        elif os.getenv("DJANGO_ENV") == "DEV":
-            accepted_channel = "marbot-test"
-   
-        if context.message.channel.name != accepted_channel:
-            await context.send(f"Solo se puede usar la funcionalidad de música en el canal de '{accepted_channel}'.")
+        accepted_channel = int(os.getenv("MUSIC_CHANNEL"))
+        if context.message.channel.id != accepted_channel:
+            await context.send(os.getenv("ERROR_403_CANAL_MUSICA"))
             return False
         elif context.author.voice is None:
             await context.send("Mae mamaste! No estás en un canal de voz")
@@ -135,14 +131,23 @@ class MusicCog(commands.Cog):
             return False
         return True
 
+    def _get_song_id(self, url):
+        """
+        Get the unique url id of a song.
+        """
+        song_id = url.split("/")[-1] #This gets the last element of the split, therefore the unique id of the video
+        song_id = song_id.split("=")[-1] #This gets the last element of the split, therefore the unique id of the video
+        return song_id
+
     @sync_to_async
     def _save_song(self, url, title, duration, thumbnail):
         """
         Save an entry with the downloaded song info, this way we don't have to download
         each new song in the future.
         """
+        unique_url = self._get_song_id(url)
         SongLog(
-            url=url,
+            url=unique_url,
             title=title,
             duration=duration,
             thumbnail=thumbnail
@@ -154,10 +159,12 @@ class MusicCog(commands.Cog):
         Return all the data from a song with its unique url
         """
         data = []
-        queryset = SongLog.objects.filter(url=url)
+        unique_url = self._get_song_id(url)
+        queryset = SongLog.objects.filter(url=unique_url)
         # print(queryset)
         if queryset:
             data = list(queryset)[0]
+            data["url"] = f"https://youtu.be/{unique_url}" # Format the url as expected
         return data
 
     def _search_youtube_url(self, item, author):
@@ -829,13 +836,9 @@ class MusicCog(commands.Cog):
         Params:
             * context: Represents the context in which a command is being invoked under.
         """
-        if self.test_mode:
-            accepted_channel = "marbot-test"
-        else:
-            accepted_channel = "music"
-
-        if context.message.channel.name != accepted_channel:
-            await context.send(f"Solo se puede usar la funcionalidad de música en el canal de '{accepted_channel}'.")
+        accepted_channel = int(os.getenv("MUSIC_CHANNEL"))
+        if context.message.channel.id != accepted_channel:
+            await context.send(os.getenv("ERROR_403_CANAL_MUSICA"))
         else:
             await context.send(
                 embed=discord.Embed(
