@@ -7,7 +7,7 @@ import validators
 import numpy as np
 import json, requests
 from discord.ext import commands
-from youtube_dl import YoutubeDL
+from yt_dlp import YoutubeDL
 from asgiref.sync import sync_to_async
 from googleapiclient.discovery import build
 from datetime import timedelta
@@ -29,7 +29,7 @@ from .music_commands import (
     DISCONNECT_COMMAND_ALIASES, PLAY_NEXT_COMMAND_ALIASES
 )
 
-class MusicCog(commands.Cog):
+class MusicCog(commands.Cog, name='Music Cog'):
     def __init__(self, bot):
         self.bot = bot # Bot instance
 
@@ -62,6 +62,8 @@ class MusicCog(commands.Cog):
             "simulate": True,
         }
 
+        self.best_quality_yt_dlp = "medium"
+
         self.current_voice_channel = None # Stores current channel the bot is connected to
 
         if os.getenv("DJANGO_ENV") == "PROD":
@@ -73,10 +75,6 @@ class MusicCog(commands.Cog):
         self.help_commands_url = ""
         if os.getenv("DEPLOYED_ON") == "local":
             self.help_commands_url = "http://localhost:8080/marbotest/commands_help/"
-        elif os.getenv("DEPLOYED_ON") == "heroku-1":
-            self.help_commands_url = "https://discord-marbot.herokuapp.com/marbot/commands_help/"
-        elif os.getenv("DEPLOYED_ON") == "heroku-2":
-            self.help_commands_url = "https://discord-marbot-2.herokuapp.com/marbot/commands_help/"
 
     ################################################################### UTIL METHODS #############################################################
 
@@ -164,8 +162,17 @@ class MusicCog(commands.Cog):
         # print(queryset)
         if queryset:
             data = list(queryset)[0]
-            data["url"] = f"https://youtu.be/{unique_url}" # Format the url as expected
         return data
+    
+    def _find_best_song_format(self, format_list):
+        for format_item in format_list:
+            if format_item.get("audio_channels") == 2:
+            # if format_item.get("format_note")[0].isdigit():
+                # video_quality = int(format_item.get("format_note").split("p")[0])
+                if format_item.get("format_note") == self.best_quality_yt_dlp:
+                    if format_item.get("acodec") == "opus":
+                        return format_item["url"]
+
 
     def _search_youtube_url(self, item, author):
         """
@@ -183,7 +190,8 @@ class MusicCog(commands.Cog):
         with YoutubeDL(self.YDL_OPTIONS) as ydl:
             try:
                 info = ydl.extract_info(f"ytsearch:{item}", download=False)["entries"][0]
-            except Exception:
+            except Exception as e:
+                print(e)
                 return False
 
         url = info["webpage_url"]
@@ -192,7 +200,7 @@ class MusicCog(commands.Cog):
         thumbnail = info["thumbnail"]
 
         return {
-            "source": info["formats"][0]["url"], 
+            "source": self._find_best_song_format(info["formats"]), 
             "title": title, 
             "duration": duration, 
             "thumbnail": thumbnail,
@@ -381,16 +389,16 @@ class MusicCog(commands.Cog):
 
                 # Get the first url
                 if self.music_queue[0][0].get("source") == "":
-                    next_song_player = ""
+                    next_song_source_player = ""
                     next_song_info = self._search_youtube_url(
                         item=self.music_queue[0][0]["url"],
                         author=self.music_queue[0][0]["author"]
                     )
                     if next_song_info:
-                        next_song_player = next_song_info["source"]
+                        next_song_source_player = next_song_info["source"]
 
                 else:
-                    next_song_player = self.music_queue[0][0]["source"]
+                    next_song_source_player = self.music_queue[0][0]["source"]
                 
                 # Remove the first element of the queue as we will be playing it
                 # Add that element to the now_playing array if this information
@@ -408,9 +416,13 @@ class MusicCog(commands.Cog):
                 # The Voice Channel we are currently on will start playing the next song
                 # Once that song is over "after=lambda e: self._reproduce_next_song_in_queue()" will play the 
                 # next song if it there is another one queued.
-                if next_song_player:
+                if next_song_source_player:
                     try:
-                        self.current_voice_channel.play(discord.FFmpegPCMAudio(next_song_player, **self.FFMPEG_OPTIONS ), after=lambda e: self._reproduce_next_song_in_queue())
+                        play_source = discord.FFmpegPCMAudio(source=next_song_source_player, **self.FFMPEG_OPTIONS)
+                        self.current_voice_channel.play(
+                            source=play_source, 
+                            after=lambda e: self._reproduce_next_song_in_queue()
+                        )
                         self.current_voice_channel.source = discord.PCMVolumeTransformer(self.current_voice_channel.source)
                         self.current_voice_channel.source.volume = 3.0
                     except Exception as e:

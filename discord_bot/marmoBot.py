@@ -9,10 +9,19 @@ if os.getenv("DJANGO_ENV") == "PROD":
 elif os.getenv("DJANGO_ENV") == "DEV":
     from discord_bot.settings.dev import BOT_NAME
 
-bot = commands.Bot(command_prefix="")
+intents = discord.Intents.default()
+intents.message_content = True
+bot = commands.Bot(command_prefix="", intents=intents)
 
-bot.add_cog(MusicCog(bot))
-bot.add_cog(HalloweenCog(bot))
+async def main():
+    await bot.add_cog(MusicCog(bot))
+    await bot.add_cog(HalloweenCog(bot))
+
+    try:
+        async with bot:
+            await bot.start(os.getenv("TOKEN"))
+    except Exception as e:
+        print("Bot Error: "+str(e))
 
 @bot.event
 async def on_ready():
@@ -28,7 +37,6 @@ async def on_ready():
     if channel:
         await channel.send(message)
 
-try:
-    bot.run(os.getenv("TOKEN"))
-except Exception:
-    print("Music Bot Error: "+bot.on_error())
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())

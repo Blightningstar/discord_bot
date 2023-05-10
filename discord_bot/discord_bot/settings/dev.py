@@ -2,7 +2,7 @@ from .base import *
 
 DEBUG = True
 
-ALLOWED_HOSTS = ["localhost","0.0.0.0",".ngrok.io"]
+ALLOWED_HOSTS = ["localhost","0.0.0.0",".ngrok.io", "127.0.0.1"]
 
 BOT_NAME = "Marbotest"
 
@@ -13,7 +13,7 @@ DATABASES = {
         "USER": "postgres",
         "PASSWORD": "postgrespw",
         "HOST": "localhost",
-        "PORT": "49155",
+        "PORT": "32768",
     }
 }
 
