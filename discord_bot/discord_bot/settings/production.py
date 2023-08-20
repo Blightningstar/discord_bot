@@ -2,10 +2,9 @@ from .base import *
 
 DEBUG = False
 
-ALLOWED_HOSTS = [".herokuapp.com"]
+ALLOWED_HOSTS = []
 
 BOT_NAME = "Marbot"
-MUSIC_CHANNEL = 775506848794804230
 
 DATABASES = {
     "default": {

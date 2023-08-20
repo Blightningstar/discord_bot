@@ -11,7 +11,7 @@ SKIP_COMMAND_ALIASES = ["saltela","s", "siguiente"]
 SHUFFLE_COMMAND_ALIASES = ["barajela", "b"]
 
 ############################### Now Playing Command
-NOW_PLAYING_COMMAND_ALIASES = ["np","cual", "cual suena", "zelda", "z"]
+NOW_PLAYING_COMMAND_ALIASES = ["np","cual", "cual suena", "zelda", "z", "ls"]
 
 ############################### Join Command
 JOIN_COMMAND_ALIASES = ["unete","u", "j"]
