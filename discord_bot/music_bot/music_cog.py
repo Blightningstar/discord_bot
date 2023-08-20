@@ -53,6 +53,7 @@ class MusicCog(commands.Cog, name='Music Cog'):
         # Based on git documentation https://github.com/ytdl-org/youtube-dl/blob/master/youtube_dl/YoutubeDL.py#L141
         self.YDL_OPTIONS = {
             "format": "bestaudio",
+            "cachedir": False,
             "postprocessors": [{
                 "key": "FFmpegExtractAudio",
                 "preferredcodec": "mp3",
@@ -80,14 +81,13 @@ class MusicCog(commands.Cog, name='Music Cog'):
 
     async def _check_if_valid(context):
         """
-        Util method used as decorator with the @commands.check so it only enables the use of the 
-        musicCog commands if:
-            - The command was issued in the music text channel.
-            - The author that send the command is in a voice channel.
+        Util method used with the @commands.check so it only enables the use of the musicCog commands if:
+            - The command was issued in the correct music text channel.
+            - The author that sent the command is present in a voice channel.
         Params:
-            * context: Represents the context in which a command is being invoked under.
+            * context: This class contains a lot of meta data an represents the context in which a command is being invoked under.
         Returns:
-            * If the command is valid
+            * (Boolean)
         """
         accepted_channel = int(os.getenv("MUSIC_CHANNEL"))
         if context.message.channel.id != accepted_channel:
@@ -104,9 +104,9 @@ class MusicCog(commands.Cog, name='Music Cog'):
             - The author that send the command is in the same voice channel as the bot.
             - The bot is playing audio in a voice channel.
         Params:
-            * context: Represents the context in which a command is being invoked under.
+            * context: This class contains a lot of meta data an represents the context in which a command is being invoked under.
         Returns:
-            * If the command is valid
+            * (Boolean)
         """
         # This means that the user is in a voice channel
         if context.author.voice:
@@ -131,7 +131,11 @@ class MusicCog(commands.Cog, name='Music Cog'):
 
     def _get_song_id(self, url):
         """
-        Get the unique url id of a song.
+        Get the unique Youtube video url id of a song.
+        Params:
+            * context: This class contains a lot of meta data an represents the context in which a command is being invoked under.
+        Returns:
+            * (String) song_id: The unique identifier of a Youtube video
         """
         song_id = url.split("/")[-1] #This gets the last element of the split, therefore the unique id of the video
         song_id = song_id.split("=")[-1] #This gets the last element of the split, therefore the unique id of the video
@@ -142,6 +146,11 @@ class MusicCog(commands.Cog, name='Music Cog'):
         """
         Save an entry with the downloaded song info, this way we don't have to download
         each new song in the future.
+        Params:
+            * (String) url: The complete url of a Youtube video
+            * (String) title: The Youtube title of a video
+            * (Float) duration: The duration of a Youtube video in seconds
+            * (String) thumbnail: The miniature thumbnail of a Youtube video
         """
         unique_url = self._get_song_id(url)
         SongLog(
@@ -155,20 +164,29 @@ class MusicCog(commands.Cog, name='Music Cog'):
     def _retrieve_song(self, url):
         """
         Return all the data from a song with its unique url
+        Params:
+            * (String) url: The complete url of a Youtube video
+        Returns:
+            * (Object) data: The SongLog Model Data for the Youtube url id
         """
         data = []
         unique_url = self._get_song_id(url)
         queryset = SongLog.objects.filter(url=unique_url)
-        # print(queryset)
         if queryset:
             data = list(queryset)[0]
         return data
     
     def _find_best_song_format(self, format_list):
+        """
+        Util Method that selects the best audio quality for a song based on 
+        audio_channels available, quality of audio & codification of the video
+        Params:
+            * (List) format_list: A list of the different quality of videos a Youtube video has available
+        Returns:
+            * (String): The url of the best quality audio based on different parameters
+        """
         for format_item in format_list:
             if format_item.get("audio_channels") == 2:
-            # if format_item.get("format_note")[0].isdigit():
-                # video_quality = int(format_item.get("format_note").split("p")[0])
                 if format_item.get("format_note") == self.best_quality_yt_dlp:
                     if format_item.get("acodec") == "opus":
                         return format_item["url"]
@@ -176,13 +194,13 @@ class MusicCog(commands.Cog, name='Music Cog'):
 
     def _search_youtube_url(self, item, author):
         """
-        Util method that takes care of fetching necessary info from a youtube url or item
+        Util method that takes care of fetching necessary info from a Youtube url or video name
         to process on a later stage.
         Params: 
-            * item: This is the url from youtube
-            * author: The user who added the songs to the queue
+            * (String) item: This is the url from youtube or the name of a video
+            * (String) author: The user who added the songs to the queue
         Returns:
-            * All the required info of the youtube url.
+            * (Dict) All the required info of the youtube url.
         """
         if self.test_mode:
             self.YDL_OPTIONS["cookiefile"] = os.getenv('COOKIE_FILE', "")
@@ -210,12 +228,12 @@ class MusicCog(commands.Cog, name='Music Cog'):
 
     def _format_youtube_duration(self, video_duration):
         """
-        Util method that takes the duration of a video in youtube's format and converts it
+        Util method that takes the duration of a video in Youtube's format and converts it
         to seconds.
         Params:
-            * video_duration: Youtube's video duration in its original format, ex: 
+            * (String) video_duration: Youtube's video duration in its original format, ex: PT2M14S
         Returns:
-            * duration_in_seconds: Video's duration converted in seconds, ex: 132.0
+            * (Float) duration_in_seconds: Video's duration converted in seconds, ex: 134.0
         """
         hours_pattern = re.compile(r"(\d+)H")
         minutes_pattern = re.compile(r"(\d+)M")
@@ -242,8 +260,8 @@ class MusicCog(commands.Cog, name='Music Cog'):
         Util method that takes care of fetching necessary info from a youtube url or item
         to process on a later stage.
         Params: 
-            * url: This is playlist url from youtube (Public or Unlisted)
-            * context: The information of where the request was sent
+            * (String) url: This is playlist url from youtube (Public or Unlisted)
+            * context: This class contains a lot of meta data an represents the context in which a command is being invoked under.
         Returns:
             * relevant_data: The array with necessary info of each song along with the 
                             voice channel the audio will play.
@@ -375,7 +393,7 @@ class MusicCog(commands.Cog, name='Music Cog'):
         """
         Util method that takes care of recursively playing the queue until it's empty.
         Params:
-            * context: The information of where the request was sent
+            * context: This class contains a lot of meta data an represents the context in which a command is being invoked under.
         """
         if len(self.music_queue) > 0:
             self.is_playing = True
@@ -502,7 +520,7 @@ class MusicCog(commands.Cog, name='Music Cog'):
         Command for playing songs, this method will search for the youtube link and 
         add the song to the queue and start playing songs if the bot isn't playing already.
         Params:
-            * context: Represents the context in which a command is being invoked under.
+            * context: This class contains a lot of meta data an represents the context in which a command is being invoked under.
             * args: The link of the youtube video or youtube search text
         """
         if await self._check_self_bot(context):
@@ -556,7 +574,7 @@ class MusicCog(commands.Cog, name='Music Cog'):
         """
         Command that displays the songs currently on the music queue.
         Params:
-            * context: Represents the context in which a command is being invoked under.
+            * context: This class contains a lot of meta data an represents the context in which a command is being invoked under.
         """
         if await self._check_self_bot(context):
             if len(self.music_queue) > 0:
@@ -701,7 +719,7 @@ class MusicCog(commands.Cog, name='Music Cog'):
         """
         Command that skips the current song playing on the bot.
         Params:
-            * context: Represents the context in which a command is being invoked under.
+            * context: This class contains a lot of meta data an represents the context in which a command is being invoked under.
         """
         if await self._check_self_bot(context):
             if self.current_voice_channel: 
@@ -720,7 +738,7 @@ class MusicCog(commands.Cog, name='Music Cog'):
         """
         Command that shuffles the order of the current songs on the music queue.
         Params:
-            * context: Represents the context in which a command is being invoked under.
+            * context: This class contains a lot of meta data an represents the context in which a command is being invoked under.
         """
         if await self._check_self_bot(context):
             if len(self.music_queue) > 0:
@@ -739,7 +757,7 @@ class MusicCog(commands.Cog, name='Music Cog'):
         """
         Command that shows the info of the current song playing.
         Params:
-            * context: Represents the context in which a command is being invoked under.
+            * context: This class contains a lot of meta data an represents the context in which a command is being invoked under.
         """
         if await self._check_self_bot(context):
             if self.is_playing:
@@ -768,7 +786,7 @@ class MusicCog(commands.Cog, name='Music Cog'):
         """
         Command that joins the bot to a voice channel.
         Params:
-            * context: Represents the context in which a command is being invoked under.
+            * context: This class contains a lot of meta data an represents the context in which a command is being invoked under.
         """
         await self._try_to_connect(context.author.voice.channel)
 
@@ -779,7 +797,7 @@ class MusicCog(commands.Cog, name='Music Cog'):
         """
         Command that pauses the music bot in the voice channel.
         Params:
-            * context: Represents the context in which a command is being invoked under.
+            * context: This class contains a lot of meta data an represents the context in which a command is being invoked under.
         """
         if await self._check_self_bot(context):
             if self.is_playing and self.current_voice_channel:
@@ -795,7 +813,7 @@ class MusicCog(commands.Cog, name='Music Cog'):
         """
         Command that resumes the pauses music bot in the voice channel.
         Params:
-            * context: Represents the context in which a command is being invoked under.
+            * context: This class contains a lot of meta data an represents the context in which a command is being invoked under.
         """
         if await self._check_self_bot(context):
             if self.is_paused == True and self.current_voice_channel:
@@ -811,7 +829,7 @@ class MusicCog(commands.Cog, name='Music Cog'):
         """
         Command for moving a song from position X to position Y
         Params:
-            * context: Represents the context in which a command is being invoked under.
+            * context: This class contains a lot of meta data an represents the context in which a command is being invoked under.
             * args: The numerical position to move in the queue.
         """
         if await self._check_self_bot(context):
@@ -846,7 +864,7 @@ class MusicCog(commands.Cog, name='Music Cog'):
         """
         Command for displaying the available help_commands
         Params:
-            * context: Represents the context in which a command is being invoked under.
+            * context: This class contains a lot of meta data an represents the context in which a command is being invoked under.
         """
         accepted_channel = int(os.getenv("MUSIC_CHANNEL"))
         if context.message.channel.id != accepted_channel:
@@ -867,7 +885,7 @@ class MusicCog(commands.Cog, name='Music Cog'):
         """
         Command for disconnecting the music bot
         Params:
-            * context: Represents the context in which a command is being invoked under.
+            * context: This class contains a lot of meta data an represents the context in which a command is being invoked under.
         """
         if await self._check_self_bot(context):
             if self.current_voice_channel:
@@ -887,7 +905,7 @@ class MusicCog(commands.Cog, name='Music Cog'):
         """
         Command to add a song at the beginning of the music queue.
         Params:
-            * context: Represents the context in which a command is being invoked under.
+            * context: This class contains a lot of meta data an represents the context in which a command is being invoked under.
         """
         if await self._check_self_bot(context):
             if len(self.music_queue) > 0:
