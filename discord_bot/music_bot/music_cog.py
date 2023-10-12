@@ -276,7 +276,7 @@ class MusicCog(commands.Cog, name='Music Cog'):
             results = json.loads(requests.get(URL1 + next_page).text)
             if results.get("items", None):
                 for item in enumerate(results["items"]):
-                    videos_in_page.append(item["contentDetails"]["videoId"])
+                    videos_in_page.append(item[1]["contentDetails"]["videoId"])
 
                 video_list.extend(videos_in_page)
 
