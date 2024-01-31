@@ -1,10 +1,19 @@
-from .views import (
-    music_commands_views, pause_view, play_view, 
-    now_playing_view, move_view, 
-    queue_view, join_view, skip_view, 
-    resume_view, shuffle_view, disconnect_view, play_next_view
-)
 from django.urls import path
+
+from .views import (
+    disconnect_view,
+    join_view,
+    move_view,
+    music_commands_views,
+    now_playing_view,
+    pause_view,
+    play_next_view,
+    play_view,
+    queue_view,
+    resume_view,
+    shuffle_view,
+    skip_view,
+)
 
 urlpatterns = [
     path("commands_help/", music_commands_views, name="commands-help"),

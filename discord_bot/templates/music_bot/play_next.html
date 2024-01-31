@@ -14,13 +14,13 @@
         <div class="alert alert-info">
             <h5><b>Notas:</b></h5>
             <p>
-                Este comando no ejecuta playlists de youtube! Para eso utilice el comando 
+                Este comando no ejecuta playlists de youtube! Para eso utilice el comando
                 <a href="{% url 'commands-play' %}">
                     <strong class="mb-1">play</strong>
                 </a>
             </p>
         </div>
-        <p> 
+        <p>
             Estos son los distintos comandos que pueden utilizar:
             <ul>
                 {% for command in command_aliases %}
