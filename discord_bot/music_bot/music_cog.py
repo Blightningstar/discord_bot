@@ -1,6 +1,5 @@
 import asyncio
 import json
-import os
 import re
 from datetime import timedelta
 
@@ -11,13 +10,10 @@ import requests
 import validators
 from asgiref.sync import sync_to_async
 from discord.ext import commands
+from django.conf import settings
+from environs import Env
 from googleapiclient.discovery import build
 from yt_dlp import YoutubeDL
-
-if os.getenv("DJANGO_ENV") == "PROD":
-    from discord_bot.settings.production import BOT_NAME
-elif os.getenv("DJANGO_ENV") == "DEV":
-    from discord_bot.settings.dev import BOT_NAME
 
 from .music_commands import (
     DISCONNECT_COMMAND_ALIASES,
@@ -37,6 +33,9 @@ from .music_commands import (
 django.setup()
 from .models import SongLog
 
+env = Env()
+env.read_env()
+
 
 class MusicCog(commands.Cog, name="Music Cog"):
     def __init__(self, bot):
@@ -53,7 +52,7 @@ class MusicCog(commands.Cog, name="Music Cog"):
         self.now_playing = []  # [song] To display the info of the current song playing
         self.embeded_queue = []  # The embed info of the queue embed messages
 
-        self.youtube_api_key = os.getenv("YT_API_KEY")
+        self.youtube_api_key = env.str("YT_API_KEY")
         self.youtube = build("youtube", "v3", developerKey=self.youtube_api_key)
 
         self.FFMPEG_OPTIONS = {
@@ -82,14 +81,11 @@ class MusicCog(commands.Cog, name="Music Cog"):
             None  # Stores current channel the bot is connected to
         )
 
-        if os.getenv("DJANGO_ENV") == "PROD":
-            self.test_mode = False
-        elif os.getenv("DJANGO_ENV") == "DEV":
-            self.test_mode = True
+        self.test_mode = env.str("DEBUG", False)
 
         # The endpoint in which the django web page documentation of music commands is running.
         self.help_commands_url = ""
-        if os.getenv("DEPLOYED_ON") == "local":
+        if env.str("DEPLOYED_ON") == "local":
             self.help_commands_url = "http://localhost:8080/marbotest/commands_help/"
 
     # UTIL METHODS
@@ -104,9 +100,9 @@ class MusicCog(commands.Cog, name="Music Cog"):
         Returns:
             * (Boolean)
         """
-        accepted_channel = int(os.getenv("MUSIC_CHANNEL"))
+        accepted_channel = int(env.str("MUSIC_CHANNEL"))
         if context.message.channel.id != accepted_channel:
-            await context.send(os.getenv("ERROR_403_CANAL_MUSICA"))
+            await context.send(env.str("ERROR_403_CANAL_MUSICA"))
             return False
         elif context.author.voice is None:
             await context.send("Mae mamaste! No estás en un canal de voz")
@@ -133,7 +129,7 @@ class MusicCog(commands.Cog, name="Music Cog"):
                     != self.current_voice_channel.channel.name
                 ):
                     await context.send(
-                        f"Mae no estás en el mismo canal de voz que {BOT_NAME}."
+                        f"Mae no estás en el mismo canal de voz que {settings.BOT_NAME}."
                     )
                     return False
 
@@ -147,7 +143,9 @@ class MusicCog(commands.Cog, name="Music Cog"):
         acepted_commands.extend(DISCONNECT_COMMAND_ALIASES)
         acepted_commands.extend(PLAY_NEXT_COMMAND_ALIASES)
         if not self.current_voice_channel and command not in acepted_commands:
-            await context.send(f"Mae el {BOT_NAME} no esta en ningun canal de voz.")
+            await context.send(
+                f"Mae el {settings.BOT_NAME} no esta en ningun canal de voz."
+            )
             return False
         return True
 
@@ -224,7 +222,7 @@ class MusicCog(commands.Cog, name="Music Cog"):
             * (Dict) All the required info of the youtube url.
         """
         if self.test_mode:
-            self.YDL_OPTIONS["cookiefile"] = os.getenv("COOKIE_FILE", "")
+            self.YDL_OPTIONS["cookiefile"] = env.path("COOKIE_FILE", "")
 
         with YoutubeDL(self.YDL_OPTIONS) as ydl:
             try:
@@ -831,10 +829,12 @@ class MusicCog(commands.Cog, name="Music Cog"):
                     # This will trigger the lambda e function from _reproduce_next_song_in_queue method to jump to the next song in queue
                     self.current_voice_channel.stop()
                 else:
-                    await context.send(f"{BOT_NAME} no esta tocando ninguna canción.")
+                    await context.send(
+                        f"{settings.BOT_NAME} no esta tocando ninguna canción."
+                    )
             else:
                 await context.send(
-                    f"Actualmente {BOT_NAME} no está en un canal de voz."
+                    f"Actualmente {settings.BOT_NAME} no está en un canal de voz."
                 )
 
     @commands.command(aliases=SHUFFLE_COMMAND_ALIASES)
@@ -905,7 +905,9 @@ class MusicCog(commands.Cog, name="Music Cog"):
                 self.current_voice_channel.pause()
                 self.is_paused = True
                 self.is_playing = False
-                await context.send(f"Al {BOT_NAME} se le paró... la canción (╹ڡ╹ )")
+                await context.send(
+                    f"Al {settings.BOT_NAME} se le paró... la canción (╹ڡ╹ )"
+                )
 
     @commands.command(aliases=RESUME_COMMAND_ALIASES)
     @commands.check(_check_if_valid)
@@ -921,7 +923,7 @@ class MusicCog(commands.Cog, name="Music Cog"):
                 self.is_paused = False
                 self.is_playing = True
                 await context.send(
-                    f"El {BOT_NAME} te seguirá tocando... la canción ♪(´▽｀)"
+                    f"El {settings.BOT_NAME} te seguirá tocando... la canción ♪(´▽｀)"
                 )
 
     @commands.command(aliases=MOVE_COMMAND_ALIASES)
@@ -974,9 +976,9 @@ class MusicCog(commands.Cog, name="Music Cog"):
         Params:
             * context: This class contains a lot of meta data an represents the context in which a command is being invoked under
         """
-        accepted_channel = int(os.getenv("MUSIC_CHANNEL"))
+        accepted_channel = int(env.str("MUSIC_CHANNEL"))
         if context.message.channel.id != accepted_channel:
-            await context.send(os.getenv("ERROR_403_CANAL_MUSICA"))
+            await context.send(env.str("ERROR_403_CANAL_MUSICA"))
         else:
             await context.send(
                 embed=discord.Embed(
@@ -1006,7 +1008,7 @@ class MusicCog(commands.Cog, name="Music Cog"):
                     self.now_playing = []
             else:
                 await context.send(
-                    f"El {BOT_NAME} no está conectado a un canal de voz."
+                    f"El {settings.BOT_NAME} no está conectado a un canal de voz."
                 )
 
     @commands.command(aliases=PLAY_NEXT_COMMAND_ALIASES)

@@ -13,21 +13,26 @@ https://docs.djangoproject.com/en/4.0/ref/settings/
 import os
 from pathlib import Path
 
+from environs import Env
+
+env = Env()
+env.read_env()
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv("SECRET_KEY")
+SECRET_KEY = env.str("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env.bool("DEBUG", False)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = eval(env("ALLOWED_HOSTS"))
 
-BOT_NAME = "Marbot"
+BOT_NAME = env.str("BOT_NAME")
 
 # Application definition
 
@@ -78,19 +83,13 @@ STATIC_ROOT = os.path.join(BASE_DIR, "static")
 
 WSGI_APPLICATION = "discord_bot.wsgi.application"
 
-WHITENOISE_USE_FINDERS = True
+WHITENOISE_USE_FINDERS = env.bool("WHITENOISE_USE_FINDERS", True)
 # STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# Database
-# https://docs.djangoproject.com/en/4.0/ref/settings/#databases
-
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#     }
-# }
-
+# HTTPS settings
+SESSION_COOKIE_SECURE = env.bool("SESSION_COOKIE_SECURE", True)
+CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", True)
+SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", True)
 
 # Password validation
 # https://docs.djangoproject.com/en/4.0/ref/settings/#auth-password-validators
@@ -125,3 +124,30 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Database Configuration
+DATABASES = {
+    "default": {
+        "ENGINE": env.str("DATABASE_ENGINE"),
+        "NAME": env.str("DATABASE_NAME"),
+        "USER": env.str("DATABASE_USER"),
+        "PASSWORD": env.str("DATABASE_PASSWORD"),
+        "HOST": env.str("DATABASE_HOST"),
+        "PORT": env.str("DATABASE_PORT"),
+    }
+}
+
+# Logging Configuration
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": env.str("LOGGING_CLASS", "logging.StreamHandler"),
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": env.str("LOGGING_LEVEL", "WARNING"),
+    },
+}

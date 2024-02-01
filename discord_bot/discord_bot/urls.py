@@ -15,17 +15,13 @@ Including another URLconf
 """
 import os
 
+from django.conf import settings
 from django.contrib import admin
 from django.urls import include, path
 
 from .views import home
 
-if os.getenv("DJANGO_ENV") == "PROD":
-    from discord_bot.settings.production import BOT_NAME
-elif os.getenv("DJANGO_ENV") == "DEV":
-    from discord_bot.settings.dev import BOT_NAME
-
-url_bot_name = str(BOT_NAME).lower()
+url_bot_name = str(settings.BOT_NAME).lower()
 urlpatterns = [
     path("", home, name="home"),
     path("admin/", admin.site.urls),

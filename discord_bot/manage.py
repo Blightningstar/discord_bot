@@ -6,12 +6,7 @@ import sys
 
 def main():
     """Run administrative tasks."""
-    if os.getenv("DJANGO_ENV") == "PROD":
-        os.environ.setdefault(
-            "DJANGO_SETTINGS_MODULE", "discord_bot.settings.production"
-        )
-    else:
-        os.environ.setdefault("DJANGO_SETTINGS_MODULE", "discord_bot.settings.dev")
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "discord_bot.discord_bot.settings")
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:
