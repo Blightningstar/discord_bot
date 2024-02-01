@@ -16,7 +16,7 @@ env.read_env()
 
 
 async def main():
-    await bot.add_cog(MusicCog(bot))
+    await bot.add_cog(MusicCog(bot, settings.BOT_NAME))
     await bot.add_cog(HalloweenCog(bot))
     try:
         async with bot:

@@ -10,7 +10,6 @@ import requests
 import validators
 from asgiref.sync import sync_to_async
 from discord.ext import commands
-from django.conf import settings
 from environs import Env
 from googleapiclient.discovery import build
 from yt_dlp import YoutubeDL
@@ -38,8 +37,9 @@ env.read_env()
 
 
 class MusicCog(commands.Cog, name="Music Cog"):
-    def __init__(self, bot):
+    def __init__(self, bot, bot_name):
         self.bot = bot  # Bot instance
+        self.bot_name = bot_name
 
         self.is_playing = False  # To know when the bot is playing music
         self.is_queue_shuffled = False  # To know when the queue has been shuffled
@@ -129,7 +129,7 @@ class MusicCog(commands.Cog, name="Music Cog"):
                     != self.current_voice_channel.channel.name
                 ):
                     await context.send(
-                        f"Mae no estás en el mismo canal de voz que {settings.BOT_NAME}."
+                        f"Mae no estás en el mismo canal de voz que {self.bot_name}."
                     )
                     return False
 
@@ -144,7 +144,7 @@ class MusicCog(commands.Cog, name="Music Cog"):
         acepted_commands.extend(PLAY_NEXT_COMMAND_ALIASES)
         if not self.current_voice_channel and command not in acepted_commands:
             await context.send(
-                f"Mae el {settings.BOT_NAME} no esta en ningun canal de voz."
+                f"Mae el {self.bot_name} no esta en ningun canal de voz."
             )
             return False
         return True
@@ -830,11 +830,11 @@ class MusicCog(commands.Cog, name="Music Cog"):
                     self.current_voice_channel.stop()
                 else:
                     await context.send(
-                        f"{settings.BOT_NAME} no esta tocando ninguna canción."
+                        f"{self.bot_name} no esta tocando ninguna canción."
                     )
             else:
                 await context.send(
-                    f"Actualmente {settings.BOT_NAME} no está en un canal de voz."
+                    f"Actualmente {self.bot_name} no está en un canal de voz."
                 )
 
     @commands.command(aliases=SHUFFLE_COMMAND_ALIASES)
@@ -906,7 +906,7 @@ class MusicCog(commands.Cog, name="Music Cog"):
                 self.is_paused = True
                 self.is_playing = False
                 await context.send(
-                    f"Al {settings.BOT_NAME} se le paró... la canción (╹ڡ╹ )"
+                    f"Al {self.bot_name} se le paró... la canción (╹ڡ╹ )"
                 )
 
     @commands.command(aliases=RESUME_COMMAND_ALIASES)
@@ -923,7 +923,7 @@ class MusicCog(commands.Cog, name="Music Cog"):
                 self.is_paused = False
                 self.is_playing = True
                 await context.send(
-                    f"El {settings.BOT_NAME} te seguirá tocando... la canción ♪(´▽｀)"
+                    f"El {self.bot_name} te seguirá tocando... la canción ♪(´▽｀)"
                 )
 
     @commands.command(aliases=MOVE_COMMAND_ALIASES)
@@ -1008,7 +1008,7 @@ class MusicCog(commands.Cog, name="Music Cog"):
                     self.now_playing = []
             else:
                 await context.send(
-                    f"El {settings.BOT_NAME} no está conectado a un canal de voz."
+                    f"El {self.bot_name} no está conectado a un canal de voz."
                 )
 
     @commands.command(aliases=PLAY_NEXT_COMMAND_ALIASES)
