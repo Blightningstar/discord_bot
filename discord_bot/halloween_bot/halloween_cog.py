@@ -1,6 +1,7 @@
 import discord
 import asyncio
 import os
+from discord_bot.settings import HALLOWEEN_CHANNEL
 from urllib.request import Request, urlopen
 from discord.ext import commands
 from datetime import datetime
@@ -40,10 +41,7 @@ class HalloweenCog(commands.Cog):
         Returns:
             * If the command is valid
         """
-        if os.getenv("DJANGO_ENV") == "PROD":
-            accepted_channel = "halloween"
-        elif os.getenv("DJANGO_ENV") == "DEV":
-            accepted_channel = "creepy-privado"
+        accepted_channel = HALLOWEEN_CHANNEL
             
         if context.message.channel.name != accepted_channel:
             await context.send(f"Solo se puede usar esta funcionalidad para Halloween en el canal de '{accepted_channel}'.")

@@ -1,13 +1,9 @@
 from discord.ext import commands
-import os
 import discord
 from music_bot.music_cog import MusicCog
 from halloween_bot.halloween_cog import HalloweenCog
+from discord_bot.settings import BOT_NAME, DISCORD_TOKEN, MUSIC_CHANNEL
 
-if os.getenv("DJANGO_ENV") == "PROD":
-    from discord_bot.settings.production import BOT_NAME
-elif os.getenv("DJANGO_ENV") == "DEV":
-    from discord_bot.settings.dev import BOT_NAME
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -19,7 +15,7 @@ async def main():
 
     try:
         async with bot:
-            await bot.start(os.getenv("TOKEN"))
+            await bot.start(DISCORD_TOKEN)
     except Exception as e:
         print("Bot Error: "+str(e))
 
@@ -28,7 +24,7 @@ async def on_ready():
     message = BOT_NAME + " ha despertado!"
     print(message)
     
-    music_channel = os.getenv("MUSIC_CHANNEL")
+    music_channel = MUSIC_CHANNEL
 
     if not isinstance(music_channel,int):
         music_channel = int(music_channel)

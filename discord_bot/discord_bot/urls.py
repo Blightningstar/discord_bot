@@ -17,11 +17,7 @@ import os
 from django.contrib import admin
 from django.urls import path, include
 from .views import home
-
-if os.getenv("DJANGO_ENV") == "PROD":
-    from discord_bot.settings.production import BOT_NAME
-elif os.getenv("DJANGO_ENV") == "DEV":
-    from discord_bot.settings.dev import BOT_NAME
+from discord_bot.settings import BOT_NAME
 
 url_bot_name = str(BOT_NAME).lower()
 urlpatterns = [
