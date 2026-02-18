@@ -1,4 +1,5 @@
 import discord
+import os
 import re
 import django
 import asyncio
@@ -10,7 +11,11 @@ from yt_dlp import YoutubeDL
 from asgiref.sync import sync_to_async
 from googleapiclient.discovery import build
 from datetime import timedelta
-from discord_bot.settings import BOT_NAME, DEBUG, MUSIC_CHANNEL, YT_API_KEY
+
+if os.getenv("DJANGO_ENV") == "PROD":
+    from discord_bot.settings.production import BOT_NAME
+elif os.getenv("DJANGO_ENV") == "DEV":
+    from discord_bot.settings.dev import BOT_NAME
 
 django.setup()    
 from .models import SongLog
@@ -37,7 +42,7 @@ class MusicCog(commands.Cog, name='Music Cog'):
         self.now_playing = [] # [song] To display the info of the current song playing
         self.embeded_queue = [] # The embed info of the queue embed messages
         
-        self.youtube_api_key = YT_API_KEY
+        self.youtube_api_key = os.getenv("YT_API_KEY")
         self.youtube = build("youtube", "v3", developerKey=self.youtube_api_key)
 
         self.FFMPEG_OPTIONS = {
@@ -45,15 +50,31 @@ class MusicCog(commands.Cog, name='Music Cog'):
             "options": "-vn"
         }
 
-        # Based on git documentation https://github.com/ytdl-org/youtube-dl/blob/master/youtube_dl/YoutubeDL.py#L173
-        self.YDL_OPTIONS = {}
+        # Based on git documentation https://github.com/ytdl-org/youtube-dl/blob/master/youtube_dl/YoutubeDL.py#L141
+        self.YDL_OPTIONS = {
+            "format": "bestaudio",
+            "cachedir": False,
+            "postprocessors": [{
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+                "preferredquality": "192",
+            }],
+            "age_limit": 40,
+            "simulate": True,
+        }
+
+        self.best_quality_yt_dlp = "medium"
 
         self.current_voice_channel = None # Stores current channel the bot is connected to
-        self.test_mode = DEBUG
+
+        if os.getenv("DJANGO_ENV") == "PROD":
+            self.test_mode = False
+        elif os.getenv("DJANGO_ENV") == "DEV":
+            self.test_mode = True
 
         # The endpoint in which the django web page documentation of music commands is running.
         self.help_commands_url = ""
-        if self.test_mode is True:
+        if os.getenv("DEPLOYED_ON") == "local":
             self.help_commands_url = "http://localhost:8080/marbotest/commands_help/"
 
     ################################################################### UTIL METHODS #############################################################
@@ -68,9 +89,9 @@ class MusicCog(commands.Cog, name='Music Cog'):
         Returns:
             * (Boolean)
         """
-        accepted_channel = MUSIC_CHANNEL
+        accepted_channel = int(os.getenv("MUSIC_CHANNEL"))
         if context.message.channel.id != accepted_channel:
-            await context.send("Este canal no está aceptando comandos.")
+            await context.send(os.getenv("ERROR_403_CANAL_MUSICA"))
             return False
         elif context.author.voice is None:
             await context.send("Mae mamaste! No estás en un canal de voz")
@@ -163,17 +184,14 @@ class MusicCog(commands.Cog, name='Music Cog'):
         Returns:
             * (String): The url of the best quality audio based on different parameters
         """
-        for f in format_list:
-            if f.get("url") and f.get("acodec") and f.get("acodec") != "none":
-                return f["url"]
-        # last-resort
-        for f in format_list:
-            if f.get("url"):
-                return f["url"]
-        return None
+        for format_item in format_list:
+            if format_item.get("audio_channels") == 2:
+                if format_item.get("format_note") == self.best_quality_yt_dlp:
+                    if format_item.get("acodec") == "opus":
+                        return format_item["url"]
 
 
-    async def _search_youtube_url(self, item, author):
+    def _search_youtube_url(self, item, author):
         """
         Util method that takes care of fetching necessary info from a Youtube url or video name
         to process on a later stage.
@@ -183,95 +201,25 @@ class MusicCog(commands.Cog, name='Music Cog'):
         Returns:
             * (Dict) All the required info of the youtube url.
         """
-        options = self.YDL_OPTIONS.copy()
-        loop = asyncio.get_running_loop()
+        if self.test_mode:
+            self.YDL_OPTIONS["cookiefile"] = os.getenv('COOKIE_FILE', "")
 
-        def _do_extract(opts):
-            with YoutubeDL(opts) as ydl:
-                if validators.url(item):
-                    return ydl.extract_info(item, download=False)
-                # ytsearch returns a dict with entries when used like CLI
-                res = ydl.extract_info(f"ytsearch:{item}", download=False)
-                # ensure same shape as single-video extraction
-                if isinstance(res, dict) and res.get("entries"):
-                    return res["entries"][0]
-                return res
-
-        try:
-            info = await loop.run_in_executor(None, lambda: _do_extract(options))
-        except Exception as e:
-            # First extraction failed; try again enabling Node.js as JS runtime (helps signature/EJS)
+        with YoutubeDL(self.YDL_OPTIONS) as ydl:
             try:
-                retry_opts = options.copy()
-                retry_opts["js_runtimes"] = {"node": {}}
-                info = await loop.run_in_executor(None, lambda: _do_extract(retry_opts))
-            except Exception as e2:
-                print("yt-dlp extract_info failed:", e2)
+                info = ydl.extract_info(f"ytsearch:{item}", download=False)["entries"][0]
+            except Exception as e:
+                print(e)
                 return False
 
-        # If extracted info lacks playable audio formats, try again enabling Node.js runtime
-        formats = info.get("formats") or []
-        has_audio = any(f.get("url") and f.get("acodec") and f.get("acodec") != "none" for f in formats)
-        if not has_audio:
-            try:
-                retry_opts = options.copy()
-                retry_opts["js_runtimes"] = {"node": {}}
-                info = await loop.run_in_executor(None, lambda: _do_extract(retry_opts))
-                formats = info.get("formats") or []
-                has_audio = any(f.get("url") and f.get("acodec") and f.get("acodec") != "none" for f in formats)
-            except Exception as e:
-                print("yt-dlp retry with js_runtimes failed:", e)
-                # continue; downstream code will handle missing formats
-
-        url = info.get("webpage_url")
-        title = info.get("title")
-        duration = info.get("duration")
-        thumbnail = info.get("thumbnail")
-
-        formats = info.get("formats", [])
-
-        # Debug dump of available formats when in test mode
-        if self.test_mode:
-            try:
-                print(f"[yt-dlp] formats for {info.get('id')}: {len(formats)} entries")
-                for f in formats:
-                    fmt_id = f.get('format_id')
-                    ext = f.get('ext')
-                    acodec = f.get('acodec')
-                    abr = f.get('abr')
-                    tbr = f.get('tbr')
-                    url_preview = (f.get('url') or '')[:120]
-                    print(f"  {fmt_id}\t{ext}\tacodec={acodec}\tabr={abr}\ttbr={tbr}\t{url_preview}")
-            except Exception:
-                pass
-
-        # Select best audio format: prefer opus, then highest abr/tbr
-        audio_formats = [f for f in formats if f.get('url') and f.get('acodec') and f.get('acodec') != 'none']
-        best = None
-        if audio_formats:
-            opus_candidates = [f for f in audio_formats if 'opus' in (f.get('acodec') or '').lower()]
-            candidates = opus_candidates or audio_formats
-            def _score(f):
-                try:
-                    return float(f.get('abr') or f.get('tbr') or 0)
-                except Exception:
-                    return 0.0
-            best = max(candidates, key=_score)
-
-        # Fallback to existing finder if our selection didn't work
-        source_url = None
-        selected_format_id = None
-        if best:
-            source_url = best.get('url')
-            selected_format_id = best.get('format_id')
-        else:
-            source_url = self._find_best_song_format(formats)
+        url = info["webpage_url"]
+        title = info["title"]
+        duration = info["duration"]
+        thumbnail = info["thumbnail"]
 
         return {
-            "source": source_url,
-            "format_id": selected_format_id,
-            "title": title,
-            "duration": duration,
+            "source": self._find_best_song_format(info["formats"]), 
+            "title": title, 
+            "duration": duration, 
             "thumbnail": thumbnail,
             "url": url,
             "author": author
@@ -365,15 +313,7 @@ class MusicCog(commands.Cog, name='Music Cog'):
                     part="contentDetails, snippet",
                     id=video_id
                 )
-                # The googleapiclient execute() call is synchronous; run it in an executor to avoid blocking the event loop
-                loop = asyncio.get_running_loop()
-                def fetch_video():
-                    return videos_request.execute()
-                try:
-                    video_response = await loop.run_in_executor(None, fetch_video)
-                except Exception as e:
-                    print(f"Error fetching video info from YouTube Data API: {e}")
-                    continue
+                video_response = videos_request.execute()
                 items = video_response.get("items", None)
 
                 if items:
@@ -414,24 +354,17 @@ class MusicCog(commands.Cog, name='Music Cog'):
             It is used to determine if the bot is joining the voice channel via the join or play command
         """
         if voice_channel_to_connect is None and not self.current_voice_channel: # The play command will join the bot to the voice_channel
-            # If the music queue is empty, nothing to connect to
-            if not self.music_queue:
-                return
-
             connected = False
-
+            
             # Try to connect to a voice channel if you are not already connected
             while connected == False:
                 try:
-                    # guard against race conditions where queue becomes empty
-                    if not self.music_queue:
-                        break
                     self.current_voice_channel = await asyncio.shield(self.music_queue[0][1].connect())
                     if self.current_voice_channel.is_connected() and self.music_queue[0][1]:
                         if self.current_voice_channel.channel.name != self.music_queue[0][1].name:
-                            # If the bot is connected but not in the same voice channel as you,
-                            # move to that channel.
-                            await self.current_voice_channel.disconnect()
+                        # If the bot is connected but not in the same voice channel as you,
+                        # move to that channel.
+                            self.current_voice_channel = await self.current_voice_channel.disconnect()
                             self.current_voice_channel = await self.music_queue[0][1].connect()
                         connected = True
                 except Exception as e:
@@ -453,7 +386,7 @@ class MusicCog(commands.Cog, name='Music Cog'):
                 print(f"Algo salio mal al usar el comando 'join' para conectar al bot: {str(e)}.")
 
 
-    async def _reproduce_next_song_in_queue(self):
+    def _reproduce_next_song_in_queue(self):
         """
         Util method that takes care of recursively playing the music queue until it's empty.
         Params:
@@ -472,7 +405,7 @@ class MusicCog(commands.Cog, name='Music Cog'):
                 # Get the first url
                 if self.music_queue[0][0].get("source") == "":
                     next_song_source_player = ""
-                    next_song_info = await self._search_youtube_url(
+                    next_song_info = self._search_youtube_url(
                         item=self.music_queue[0][0]["url"],
                         author=self.music_queue[0][0]["author"]
                     )
@@ -501,18 +434,17 @@ class MusicCog(commands.Cog, name='Music Cog'):
                 if next_song_source_player:
                     try:
                         play_source = discord.FFmpegPCMAudio(source=next_song_source_player, **self.FFMPEG_OPTIONS)
-                        # Schedule the async reproduction when the current track ends
                         self.current_voice_channel.play(
-                            source=play_source,
-                            after=lambda e: asyncio.run_coroutine_threadsafe(self._reproduce_next_song_in_queue(), self.bot.loop)
+                            source=play_source, 
+                            after=lambda e: self._reproduce_next_song_in_queue()
                         )
                         self.current_voice_channel.source = discord.PCMVolumeTransformer(self.current_voice_channel.source)
                         self.current_voice_channel.source.volume = 3.0
                     except Exception as e:
                         print("Error with FFmpeg: "+str(e))
-                        await self._reproduce_next_song_in_queue()
+                        self._reproduce_next_song_in_queue()
                 else:
-                    await self._reproduce_next_song_in_queue()
+                    self._reproduce_next_song_in_queue()
 
             except Exception as e:
                 print(str(e))
@@ -612,11 +544,11 @@ class MusicCog(commands.Cog, name='Music Cog'):
                             if self.is_playing is False and self.is_paused is False:
                                 # Try to connect to a voice channel if you are not already connected
                                 await self._try_to_connect()
-                                await self._reproduce_next_song_in_queue()
+                                self._reproduce_next_song_in_queue()
 
                     await context.send(f"{songs_added} canciones añadidas a la colaヾ(•ω•`)o")
             else:    
-                song_info = await self._search_youtube_url(item=youtube_query, author=author_of_command)
+                song_info = self._search_youtube_url(item=youtube_query, author=author_of_command)
                 if not song_info: 
                     # This was done for the exception that _search_youtube_url can throw if you try to
                     # reproduce a playlist or livestream. Search later if this can be avoided.
@@ -634,7 +566,7 @@ class MusicCog(commands.Cog, name='Music Cog'):
             if self.is_playing == False and self.is_paused == False:
                 # Try to connect to a voice channel if you are not already connected
                 await self._try_to_connect()
-                await self._reproduce_next_song_in_queue()
+                self._reproduce_next_song_in_queue()
 
 
     @commands.command(aliases=QUEUE_COMMAND_ALIASES)
@@ -673,10 +605,10 @@ class MusicCog(commands.Cog, name='Music Cog'):
                         next_song_info = await self._retrieve_song(url=self.music_queue[embed_songs][0]["url"])
                         if not next_song_info: 
                             # If retriving the info from our db didn't work
-                                next_song_info = await self._search_youtube_url(
-                                    item=self.music_queue[embed_songs][0]["url"],
-                                    author=self.music_queue[embed_songs][0]["author"]
-                                )
+                            next_song_info = self._search_youtube_url(
+                                item=self.music_queue[embed_songs][0]["url"],
+                                author=self.music_queue[embed_songs][0]["author"]
+                            )
 
                         if next_song_info: 
                             # If retriving the info from our db worked
@@ -935,9 +867,9 @@ class MusicCog(commands.Cog, name='Music Cog'):
         Params:
             * context: This class contains a lot of meta data an represents the context in which a command is being invoked under
         """
-        accepted_channel = MUSIC_CHANNEL
+        accepted_channel = int(os.getenv("MUSIC_CHANNEL"))
         if context.message.channel.id != accepted_channel:
-            await context.send("Este canal no está aceptando comandos.")
+            await context.send(os.getenv("ERROR_403_CANAL_MUSICA"))
         else:
             await context.send(
                 embed=discord.Embed(
@@ -987,7 +919,7 @@ class MusicCog(commands.Cog, name='Music Cog'):
                 is_playlist = self._is_youtube_playlist(youtube_query=youtube_query)
 
                 if not is_playlist:
-                    song_info = await self._search_youtube_url(item=youtube_query, author=author_of_command)
+                    song_info = self._search_youtube_url(item=youtube_query, author=author_of_command)
                     if not song_info: 
                         # This was done for the exception that _search_youtube_url can throw if you try to
                         # reproduce a playlist or livestream. Search later if this can be avoided.
