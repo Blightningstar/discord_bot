@@ -1,83 +1,82 @@
-import discord
-import os
-import re
-import django
 import asyncio
-import validators
-import numpy as np
-import json, requests
-from discord.ext import commands
-from yt_dlp import YoutubeDL
-from asgiref.sync import sync_to_async
-from googleapiclient.discovery import build
+import json
+import re
 from datetime import timedelta
 
-if os.getenv("DJANGO_ENV") == "PROD":
-    from discord_bot.settings.production import BOT_NAME
-elif os.getenv("DJANGO_ENV") == "DEV":
-    from discord_bot.settings.dev import BOT_NAME
+import discord
+import django
+import numpy as np
+import requests
+import validators
+from asgiref.sync import sync_to_async
+from discord.ext import commands
+from googleapiclient.discovery import build
+from yt_dlp import YoutubeDL
 
-django.setup()    
+from discord_bot.settings import BOT_NAME, DEBUG, MUSIC_CHANNEL, YT_API_KEY
+
+django.setup()
 from .models import SongLog
-
 from .music_commands import (
-    PLAY_COMMAND_ALIASES, QUEUE_COMMAND_ALIASES, 
-    SKIP_COMMAND_ALIASES, SHUFFLE_COMMAND_ALIASES, 
-    NOW_PLAYING_COMMAND_ALIASES, JOIN_COMMAND_ALIASES,
-    PAUSE_COMMAND_ALIASES, RESUME_COMMAND_ALIASES,
-    MOVE_COMMAND_ALIASES, HELP_COMMAND_ALIASES,
-    DISCONNECT_COMMAND_ALIASES, PLAY_NEXT_COMMAND_ALIASES
+    DISCONNECT_COMMAND_ALIASES,
+    HELP_COMMAND_ALIASES,
+    JOIN_COMMAND_ALIASES,
+    MOVE_COMMAND_ALIASES,
+    NOW_PLAYING_COMMAND_ALIASES,
+    PAUSE_COMMAND_ALIASES,
+    PLAY_COMMAND_ALIASES,
+    PLAY_NEXT_COMMAND_ALIASES,
+    QUEUE_COMMAND_ALIASES,
+    RESUME_COMMAND_ALIASES,
+    SHUFFLE_COMMAND_ALIASES,
+    SKIP_COMMAND_ALIASES,
 )
 
-class MusicCog(commands.Cog, name='Music Cog'):
+
+class MusicCog(commands.Cog, name="Music Cog"):
     def __init__(self, bot):
-        self.bot = bot # Bot instance
+        self.bot = bot  # Bot instance
 
-        self.is_playing = False # To know when the bot is playing music
-        self.is_queue_shuffled = False # To know when the queue has been shuffled
-        self.is_paused = False # To know when the bot is paused
+        self.is_playing = False  # To know when the bot is playing music
+        self.is_queue_shuffled = False  # To know when the queue has been shuffled
+        self.is_paused = False  # To know when the bot is paused
 
-        self.music_queue = [] # [song, channel] The main music queue of songs to play
-        self.shuffled_music_queue = [] # [song, channel] used to store temporarily the shuffled queue, this avoids problems when a song is playing
-        self.now_playing = [] # [song] To display the info of the current song playing
-        self.embeded_queue = [] # The embed info of the queue embed messages
-        
-        self.youtube_api_key = os.getenv("YT_API_KEY")
+        self.music_queue = []  # [song, channel] The main music queue of songs to play
+        self.shuffled_music_queue = (
+            []
+        )  # [song, channel] used to store temporarily the shuffled queue, this avoids problems when a song is playing
+        self.now_playing = []  # [song] To display the info of the current song playing
+        self.embeded_queue = []  # The embed info of the queue embed messages
+
+        self.music_queue = []  # [song, channel] The main music queue of songs to play
+        self.shuffled_music_queue = (
+            []
+        )  # [song, channel] used to store temporarily the shuffled queue, this avoids problems when a song is playing
+        self.now_playing = []  # [song] To display the info of the current song playing
+        self.embeded_queue = []  # The embed info of the queue embed messages
+
+        self.youtube_api_key = YT_API_KEY
         self.youtube = build("youtube", "v3", developerKey=self.youtube_api_key)
 
         self.FFMPEG_OPTIONS = {
             "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
-            "options": "-vn"
+            "options": "-vn",
         }
 
-        # Based on git documentation https://github.com/ytdl-org/youtube-dl/blob/master/youtube_dl/YoutubeDL.py#L141
-        self.YDL_OPTIONS = {
-            "format": "bestaudio",
-            "cachedir": False,
-            "postprocessors": [{
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": "mp3",
-                "preferredquality": "192",
-            }],
-            "age_limit": 40,
-            "simulate": True,
-        }
+        # Based on git documentation https://github.com/ytdl-org/youtube-dl/blob/master/youtube_dl/YoutubeDL.py#L173
+        self.YDL_OPTIONS = {}
 
-        self.best_quality_yt_dlp = "medium"
-
-        self.current_voice_channel = None # Stores current channel the bot is connected to
-
-        if os.getenv("DJANGO_ENV") == "PROD":
-            self.test_mode = False
-        elif os.getenv("DJANGO_ENV") == "DEV":
-            self.test_mode = True
+        self.current_voice_channel = (
+            None  # Stores current channel the bot is connected to
+        )
+        self.test_mode = DEBUG
 
         # The endpoint in which the django web page documentation of music commands is running.
         self.help_commands_url = ""
-        if os.getenv("DEPLOYED_ON") == "local":
+        if self.test_mode is True:
             self.help_commands_url = "http://localhost:8080/marbotest/commands_help/"
 
-    ################################################################### UTIL METHODS #############################################################
+    # UTIL METHODS
 
     async def _check_if_valid(context):
         """
@@ -89,9 +88,9 @@ class MusicCog(commands.Cog, name='Music Cog'):
         Returns:
             * (Boolean)
         """
-        accepted_channel = int(os.getenv("MUSIC_CHANNEL"))
+        accepted_channel = MUSIC_CHANNEL
         if context.message.channel.id != accepted_channel:
-            await context.send(os.getenv("ERROR_403_CANAL_MUSICA"))
+            await context.send("Este canal no está aceptando comandos.")
             return False
         elif context.author.voice is None:
             await context.send("Mae mamaste! No estás en un canal de voz")
@@ -113,12 +112,19 @@ class MusicCog(commands.Cog, name='Music Cog'):
             # This means the bot is currently playing a song
             if self.is_playing:
                 # This means that the user is not in the same channel as the bot
-                if context.author.voice.channel.name != self.current_voice_channel.channel.name:
-                    await context.send(f"Mae no estás en el mismo canal de voz que {BOT_NAME}.")
+                if (
+                    context.author.voice.channel.name
+                    != self.current_voice_channel.channel.name
+                ):
+                    await context.send(
+                        f"Mae no estás en el mismo canal de voz que {BOT_NAME}."
+                    )
                     return False
 
-        command = (context.message.clean_content).split(" ")[0] # Get the command the user used.
-        # If the command is not the play or disconnect one it is an error. 
+        command = (context.message.clean_content).split(" ")[
+            0
+        ]  # Get the command the user used.
+        # If the command is not the play or disconnect one it is an error.
         # Since play connects the bot and disconnects makes it leave a voice channel.
         acepted_commands = ["play", "disconnect"]
         acepted_commands.extend(PLAY_COMMAND_ALIASES)
@@ -137,8 +143,12 @@ class MusicCog(commands.Cog, name='Music Cog'):
         Returns:
             * (String) song_id: The unique identifier of a Youtube video
         """
-        song_id = url.split("/")[-1] #This gets the last element of the split, therefore the unique id of the video
-        song_id = song_id.split("=")[-1] #This gets the last element of the split, therefore the unique id of the video
+        song_id = url.split("/")[
+            -1
+        ]  # This gets the last element of the split, therefore the unique id of the video
+        song_id = song_id.split("=")[
+            -1
+        ]  # This gets the last element of the split, therefore the unique id of the video
         return song_id
 
     @sync_to_async
@@ -153,10 +163,7 @@ class MusicCog(commands.Cog, name='Music Cog'):
         """
         unique_url = self._get_song_id(url)
         SongLog(
-            url=unique_url,
-            title=title,
-            duration=duration,
-            thumbnail=thumbnail
+            url=unique_url, title=title, duration=duration, thumbnail=thumbnail
         ).save()
 
     @sync_to_async
@@ -174,55 +181,143 @@ class MusicCog(commands.Cog, name='Music Cog'):
         if queryset:
             data = list(queryset)[0]
         return data
-    
+
     def _find_best_song_format(self, format_list):
         """
-        Util Method that selects the best audio quality for a song based on audio_channels available, 
+        Util Method that selects the best audio quality for a song based on audio_channels available,
         quality of audio & codification of the video.
         Params:
             * (List) format_list: A list of the different quality of videos a Youtube video has available
         Returns:
             * (String): The url of the best quality audio based on different parameters
         """
-        for format_item in format_list:
-            if format_item.get("audio_channels") == 2:
-                if format_item.get("format_note") == self.best_quality_yt_dlp:
-                    if format_item.get("acodec") == "opus":
-                        return format_item["url"]
+        for f in format_list:
+            if f.get("url") and f.get("acodec") and f.get("acodec") != "none":
+                return f["url"]
+        # last-resort
+        for f in format_list:
+            if f.get("url"):
+                return f["url"]
+        return None
 
-
-    def _search_youtube_url(self, item, author):
+    async def _search_youtube_url(self, item, author):
         """
         Util method that takes care of fetching necessary info from a Youtube url or video name
         to process on a later stage.
-        Params: 
+        Params:
             * (String) item: This is the url from youtube or the name of a video
             * (String) author: The user who added the songs to the queue
         Returns:
             * (Dict) All the required info of the youtube url.
         """
-        if self.test_mode:
-            self.YDL_OPTIONS["cookiefile"] = os.getenv('COOKIE_FILE', "")
+        options = self.YDL_OPTIONS.copy()
+        loop = asyncio.get_running_loop()
 
-        with YoutubeDL(self.YDL_OPTIONS) as ydl:
+        def _do_extract(opts):
+            with YoutubeDL(opts) as ydl:
+                if validators.url(item):
+                    return ydl.extract_info(item, download=False)
+                # ytsearch returns a dict with entries when used like CLI
+                res = ydl.extract_info(f"ytsearch:{item}", download=False)
+                # ensure same shape as single-video extraction
+                if isinstance(res, dict) and res.get("entries"):
+                    return res["entries"][0]
+                return res
+
+        try:
+            info = await loop.run_in_executor(None, lambda: _do_extract(options))
+        except Exception:
+            # First extraction failed; try again enabling Node.js as JS runtime (helps signature/EJS)
             try:
-                info = ydl.extract_info(f"ytsearch:{item}", download=False)["entries"][0]
-            except Exception as e:
-                print(e)
+                retry_opts = options.copy()
+                retry_opts["js_runtimes"] = {"node": {}}
+                info = await loop.run_in_executor(None, lambda: _do_extract(retry_opts))
+            except Exception as e2:
+                print("yt-dlp extract_info failed:", e2)
                 return False
 
-        url = info["webpage_url"]
-        title = info["title"]
-        duration = info["duration"]
-        thumbnail = info["thumbnail"]
+        # If extracted info lacks playable audio formats, try again enabling Node.js runtime
+        formats = info.get("formats") or []
+        has_audio = any(
+            f.get("url") and f.get("acodec") and f.get("acodec") != "none"
+            for f in formats
+        )
+        if not has_audio:
+            try:
+                retry_opts = options.copy()
+                retry_opts["js_runtimes"] = {"node": {}}
+                info = await loop.run_in_executor(None, lambda: _do_extract(retry_opts))
+                formats = info.get("formats") or []
+                has_audio = any(
+                    f.get("url") and f.get("acodec") and f.get("acodec") != "none"
+                    for f in formats
+                )
+            except Exception as e:
+                print("yt-dlp retry with js_runtimes failed:", e)
+                # continue; downstream code will handle missing formats
+
+        url = info.get("webpage_url")
+        title = info.get("title")
+        duration = info.get("duration")
+        thumbnail = info.get("thumbnail")
+
+        formats = info.get("formats", [])
+
+        # Debug dump of available formats when in test mode
+        if self.test_mode:
+            try:
+                print(f"[yt-dlp] formats for {info.get('id')}: {len(formats)} entries")
+                for f in formats:
+                    fmt_id = f.get("format_id")
+                    ext = f.get("ext")
+                    acodec = f.get("acodec")
+                    abr = f.get("abr")
+                    tbr = f.get("tbr")
+                    url_preview = (f.get("url") or "")[:120]
+                    print(
+                        f"  {fmt_id}\t{ext}\tacodec={acodec}\tabr={abr}\ttbr={tbr}\t{url_preview}"
+                    )
+            except Exception:
+                pass
+
+        # Select best audio format: prefer opus, then highest abr/tbr
+        audio_formats = [
+            f
+            for f in formats
+            if f.get("url") and f.get("acodec") and f.get("acodec") != "none"
+        ]
+        best = None
+        if audio_formats:
+            opus_candidates = [
+                f for f in audio_formats if "opus" in (f.get("acodec") or "").lower()
+            ]
+            candidates = opus_candidates or audio_formats
+
+            def _score(f):
+                try:
+                    return float(f.get("abr") or f.get("tbr") or 0)
+                except Exception:
+                    return 0.0
+
+            best = max(candidates, key=_score)
+
+        # Fallback to existing finder if our selection didn't work
+        source_url = None
+        selected_format_id = None
+        if best:
+            source_url = best.get("url")
+            selected_format_id = best.get("format_id")
+        else:
+            source_url = self._find_best_song_format(formats)
 
         return {
-            "source": self._find_best_song_format(info["formats"]), 
-            "title": title, 
-            "duration": duration, 
+            "source": source_url,
+            "format_id": selected_format_id,
+            "title": title,
+            "duration": duration,
             "thumbnail": thumbnail,
             "url": url,
-            "author": author
+            "author": author,
         }
 
     def _format_youtube_duration(self, video_duration):
@@ -243,13 +338,11 @@ class MusicCog(commands.Cog, name='Music Cog'):
         seconds = seconds_pattern.search(video_duration)
 
         hours = int(hours.group(1)) if hours else 0
-        minutes = int(minutes.group(1)) if minutes else 0 
+        minutes = int(minutes.group(1)) if minutes else 0
         seconds = int(seconds.group(1)) if seconds else 0
 
         duration_in_seconds = timedelta(
-            hours = hours,
-            minutes = minutes,
-            seconds = seconds
+            hours=hours, minutes=minutes, seconds=seconds
         ).total_seconds()
 
         return duration_in_seconds
@@ -258,7 +351,7 @@ class MusicCog(commands.Cog, name='Music Cog'):
         """
         Util method that takes care of fetching necessary info from a Youtube url or item
         to process on a later stage.
-        Params: 
+        Params:
             * (String) url: This is a Youtube's playlist url (Public or Unlisted)
             * context: This class contains a lot of meta data an represents the context in which a command is being invoked under
         Returns:
@@ -266,7 +359,9 @@ class MusicCog(commands.Cog, name='Music Cog'):
         """
         relevant_data = []
         playlist_id = url.split("list=")[1]
-        URL1 = "https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&maxResults=50&fields=items/contentDetails/videoId,nextPageToken&key={}&playlistId={}&pageToken=".format(self.youtube_api_key, playlist_id)
+        URL1 = "https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&maxResults=50&fields=items/contentDetails/videoId,nextPageToken&key={}&playlistId={}&pageToken=".format(
+            self.youtube_api_key, playlist_id
+        )
         next_page = ""
         video_list = []
 
@@ -287,12 +382,13 @@ class MusicCog(commands.Cog, name='Music Cog'):
             elif results.get("error"):
                 error_reason = results["error"].get("errors")[0].get("reason")
                 if error_reason == "playlistNotFound":
-                    await context.send("Mae la playlist de Youtube está como privada. Pruebe cambiandola a Unlisted o Public.")
+                    await context.send(
+                        "Mae la playlist de Youtube está como privada. Pruebe cambiandola a Unlisted o Public."
+                    )
                     break
             else:
                 await context.send("Mae la playlist de Youtube está vacia.")
                 break
-
 
         for video_id in video_list:
             url = f"https://youtu.be/{video_id}"
@@ -301,19 +397,28 @@ class MusicCog(commands.Cog, name='Music Cog'):
                 # If we have the song in our database
                 video_info = {
                     "source": "",
-                    "title": song_log_data.title, 
-                    "duration": song_log_data.duration, 
+                    "title": song_log_data.title,
+                    "duration": song_log_data.duration,
                     "thumbnail": song_log_data.thumbnail,
                     "url": url,
-                    "author": context.author.nick
+                    "author": context.author.nick,
                 }
             else:
                 # We don't have the song in our database so we'll fetch and save the info
                 videos_request = self.youtube.videos().list(
-                    part="contentDetails, snippet",
-                    id=video_id
+                    part="contentDetails, snippet", id=video_id
                 )
-                video_response = videos_request.execute()
+                # The googleapiclient execute() call is synchronous; run it in an executor to avoid blocking the event loop
+                loop = asyncio.get_running_loop()
+
+                def fetch_video():
+                    return videos_request.execute()
+
+                try:
+                    video_response = await loop.run_in_executor(None, fetch_video)
+                except Exception as e:
+                    print(f"Error fetching video info from YouTube Data API: {e}")
+                    continue
                 items = video_response.get("items", None)
 
                 if items:
@@ -326,67 +431,95 @@ class MusicCog(commands.Cog, name='Music Cog'):
                     thumbnail = snippet.get("thumbnails").get("default").get("url")
 
                     await self._save_song(
-                        url=url,
-                        title=title,
-                        duration=duration,
-                        thumbnail=thumbnail
+                        url=url, title=title, duration=duration, thumbnail=thumbnail
                     )
-                    
+
                     video_info = {
                         "source": "",
-                        "title": title, 
-                        "duration": duration, 
+                        "title": title,
+                        "duration": duration,
                         "thumbnail": thumbnail,
                         "url": url,
-                        "author": context.author.nick
+                        "author": context.author.nick,
                     }
 
             relevant_data.append(video_info)
 
         return relevant_data
-        
 
     async def _try_to_connect(self, voice_channel_to_connect=None):
         """
         Util method in charge of connecting for the bot to a voice channel.
         Params:
-            * (Class) voice_channel_to_connect: The discord voice channel from which a user issued a join command. 
+            * (Class) voice_channel_to_connect: The discord voice channel from which a user issued a join command.
             It is used to determine if the bot is joining the voice channel via the join or play command
         """
-        if voice_channel_to_connect is None and not self.current_voice_channel: # The play command will join the bot to the voice_channel
+        if (
+            voice_channel_to_connect is None and not self.current_voice_channel
+        ):  # The play command will join the bot to the voice_channel
+            # If the music queue is empty, nothing to connect to
+            if not self.music_queue:
+                return
+
             connected = False
-            
+
             # Try to connect to a voice channel if you are not already connected
-            while connected == False:
+            while connected is False:
                 try:
-                    self.current_voice_channel = await asyncio.shield(self.music_queue[0][1].connect())
-                    if self.current_voice_channel.is_connected() and self.music_queue[0][1]:
-                        if self.current_voice_channel.channel.name != self.music_queue[0][1].name:
-                        # If the bot is connected but not in the same voice channel as you,
-                        # move to that channel.
-                            self.current_voice_channel = await self.current_voice_channel.disconnect()
-                            self.current_voice_channel = await self.music_queue[0][1].connect()
+                    # guard against race conditions where queue becomes empty
+                    if not self.music_queue:
+                        break
+                    self.current_voice_channel = await asyncio.shield(
+                        self.music_queue[0][1].connect()
+                    )
+                    if (
+                        self.current_voice_channel.is_connected()
+                        and self.music_queue[0][1]
+                    ):
+                        if (
+                            self.current_voice_channel.channel.name
+                            != self.music_queue[0][1].name
+                        ):
+                            # If the bot is connected but not in the same voice channel as you,
+                            # move to that channel.
+                            await self.current_voice_channel.disconnect()
+                            self.current_voice_channel = await self.music_queue[0][
+                                1
+                            ].connect()
                         connected = True
                 except Exception as e:
                     print(f"Algo salio mal al conectar al bot: {str(e)}.")
                     break
 
-        else: # The join command will join the bot to the voice channel
+        else:  # The join command will join the bot to the voice channel
             try:
                 if not self.current_voice_channel:
-                    self.current_voice_channel = await asyncio.shield(voice_channel_to_connect.connect())
+                    self.current_voice_channel = await asyncio.shield(
+                        voice_channel_to_connect.connect()
+                    )
 
-                elif self.current_voice_channel and self.current_voice_channel.is_connected():
-                    if self.current_voice_channel.channel.name != voice_channel_to_connect.name:
+                elif (
+                    self.current_voice_channel
+                    and self.current_voice_channel.is_connected()
+                ):
+                    if (
+                        self.current_voice_channel.channel.name
+                        != voice_channel_to_connect.name
+                    ):
                         # If the bot is connected but not in the same voice channel as you,
                         # move to that channel.
-                        self.current_voice_channel = await self.current_voice_channel.disconnect()
-                        self.current_voice_channel = await voice_channel_to_connect.connect()
+                        self.current_voice_channel = (
+                            await self.current_voice_channel.disconnect()
+                        )
+                        self.current_voice_channel = (
+                            await voice_channel_to_connect.connect()
+                        )
             except Exception as e:
-                print(f"Algo salio mal al usar el comando 'join' para conectar al bot: {str(e)}.")
+                print(
+                    f"Algo salio mal al usar el comando 'join' para conectar al bot: {str(e)}."
+                )
 
-
-    def _reproduce_next_song_in_queue(self):
+    async def _reproduce_next_song_in_queue(self):
         """
         Util method that takes care of recursively playing the music queue until it's empty.
         Params:
@@ -396,7 +529,7 @@ class MusicCog(commands.Cog, name='Music Cog'):
             self.is_playing = True
             next_song_info = ""
             try:
-                if self.is_queue_shuffled == True:
+                if self.is_queue_shuffled is True:
                     # Check if the queue is shuffled to update the queue.
                     # We do this here before a new song starts!
                     self.music_queue = self.shuffled_music_queue
@@ -405,16 +538,16 @@ class MusicCog(commands.Cog, name='Music Cog'):
                 # Get the first url
                 if self.music_queue[0][0].get("source") == "":
                     next_song_source_player = ""
-                    next_song_info = self._search_youtube_url(
+                    next_song_info = await self._search_youtube_url(
                         item=self.music_queue[0][0]["url"],
-                        author=self.music_queue[0][0]["author"]
+                        author=self.music_queue[0][0]["author"],
                     )
                     if next_song_info:
                         next_song_source_player = next_song_info["source"]
 
                 else:
                     next_song_source_player = self.music_queue[0][0]["source"]
-                
+
                 # Remove the first element of the queue as we will be playing it
                 # Add that element to the now_playing array if this information
                 # is needed later.
@@ -429,22 +562,26 @@ class MusicCog(commands.Cog, name='Music Cog'):
                     self.now_playing.append(self.music_queue.pop(0)[0])
 
                 # The Voice Channel we are currently on will start playing the next song
-                # Once that song is over "after=lambda e: self._reproduce_next_song_in_queue()" will play the 
+                # Once that song is over "after=lambda e: self._reproduce_next_song_in_queue()" will play the
                 # next song if it there is another one queued.
                 if next_song_source_player:
                     try:
-                        play_source = discord.FFmpegPCMAudio(source=next_song_source_player, **self.FFMPEG_OPTIONS)
-                        self.current_voice_channel.play(
-                            source=play_source, 
-                            after=lambda e: self._reproduce_next_song_in_queue()
+                        play_source = discord.FFmpegPCMAudio(
+                            source=next_song_source_player, **self.FFMPEG_OPTIONS
                         )
-                        self.current_voice_channel.source = discord.PCMVolumeTransformer(self.current_voice_channel.source)
+                        # Schedule the async reproduction when the current track ends
+                        self.current_voice_channel.play(
+                            source=play_source,
+                            after=lambda e: asyncio.run_coroutine_threadsafe(
+                                self._reproduce_next_song_in_queue(), self.bot.loop
+                            ),
+                        )
                         self.current_voice_channel.source.volume = 3.0
                     except Exception as e:
-                        print("Error with FFmpeg: "+str(e))
-                        self._reproduce_next_song_in_queue()
+                        print("Error with FFmpeg: " + str(e))
+                        await self._reproduce_next_song_in_queue()
                 else:
-                    self._reproduce_next_song_in_queue()
+                    await self._reproduce_next_song_in_queue()
 
             except Exception as e:
                 print(str(e))
@@ -465,7 +602,7 @@ class MusicCog(commands.Cog, name='Music Cog'):
         seconds %= 3600
         minutes = seconds // 60
         seconds %= 60
-        
+
         return "%d:%02d:%02d" % (hour, minutes, seconds)
 
     def _add_embed_in_queue(self, list_of_songs):
@@ -474,10 +611,10 @@ class MusicCog(commands.Cog, name='Music Cog'):
         Params:
             * (String) list_of_songs: All the songs that will be placed in an individual embed message.
         """
-        self.embeded_queue.append(discord.Embed(
-            title= "Lista de Canciones en cola 🍆",
-            color=discord.Color.blurple())
-            .add_field(name="Canciones", value=list_of_songs, inline=False)
+        self.embeded_queue.append(
+            discord.Embed(
+                title="Lista de Canciones en cola 🍆", color=discord.Color.blurple()
+            ).add_field(name="Canciones", value=list_of_songs, inline=False)
         )
 
     def _sanitize_youtube_query(self, youtube_query):
@@ -507,16 +644,15 @@ class MusicCog(commands.Cog, name='Music Cog'):
                 # This means it is a playlist
                 return True
         return False
-        
 
-    ################################################################### COMMANDS METHODS #########################################################
+    # COMMANDS METHODS
 
     @commands.command(aliases=PLAY_COMMAND_ALIASES)
     @commands.check(_check_if_valid)
     async def play(self, context, *args):
         """
         Main Command for playing songs, this method can:
-            - Search for a Youtube video based on just text related to a video just like Youtube's search bar 
+            - Search for a Youtube video based on just text related to a video just like Youtube's search bar
             - Take a Youtube's url
             - Take a Youtube's playlist url
         and then adds the songs to the queue to start playing songs if the bot isn't playing already.
@@ -534,8 +670,10 @@ class MusicCog(commands.Cog, name='Music Cog'):
 
             if is_playlist:
                 await context.send("Procesando la playlist...")
-                playlist_info = await self._search_youtube_playlist(url=youtube_query, context=context)
-                if not playlist_info: 
+                playlist_info = await self._search_youtube_playlist(
+                    url=youtube_query, context=context
+                )
+                if not playlist_info:
                     await context.send("Mae no se pudo poner la playlist!")
                 else:
                     for songs_added, video in enumerate(playlist_info):
@@ -544,12 +682,16 @@ class MusicCog(commands.Cog, name='Music Cog'):
                             if self.is_playing is False and self.is_paused is False:
                                 # Try to connect to a voice channel if you are not already connected
                                 await self._try_to_connect()
-                                self._reproduce_next_song_in_queue()
+                                await self._reproduce_next_song_in_queue()
 
-                    await context.send(f"{songs_added} canciones añadidas a la colaヾ(•ω•`)o")
-            else:    
-                song_info = self._search_youtube_url(item=youtube_query, author=author_of_command)
-                if not song_info: 
+                    await context.send(
+                        f"{songs_added} canciones añadidas a la colaヾ(•ω•`)o"
+                    )
+            else:
+                song_info = await self._search_youtube_url(
+                    item=youtube_query, author=author_of_command
+                )
+                if not song_info:
                     # This was done for the exception that _search_youtube_url can throw if you try to
                     # reproduce a playlist or livestream. Search later if this can be avoided.
                     await context.send("Mae no se pudo descargar la canción.")
@@ -558,16 +700,15 @@ class MusicCog(commands.Cog, name='Music Cog'):
                         url=song_info["url"],
                         title=song_info["title"],
                         duration=song_info["duration"],
-                        thumbnail=song_info["thumbnail"]
+                        thumbnail=song_info["thumbnail"],
                     )
                     self.music_queue.append([song_info, voice_channel])
                     await context.send("Canción añadida a la colaヾ(•ω•`)o")
 
-            if self.is_playing == False and self.is_paused == False:
+            if self.is_playing is False and self.is_paused is False:
                 # Try to connect to a voice channel if you are not already connected
                 await self._try_to_connect()
-                self._reproduce_next_song_in_queue()
-
+                await self._reproduce_next_song_in_queue()
 
     @commands.command(aliases=QUEUE_COMMAND_ALIASES)
     @commands.check(_check_if_valid)
@@ -579,15 +720,18 @@ class MusicCog(commands.Cog, name='Music Cog'):
         """
         if await self._check_self_bot(context):
             if len(self.music_queue) > 0:
-                current = 0 # Current embed being displayed
+                current = 0  # Current embed being displayed
                 queue_display_msg = ""  # Message added to field of embed object.
-                embed_songs = 0 # Each time a song is added to the embed queue.
-                queue_display_list = [] # Local list so when a song leaves the queue doesn't generate an index error.
-                self.embeded_queue = [] # We reset the embeded queue if multiple calls of queue command are done.
-                queue_duration = 0 # Total duration of all the songs in queue.
-                
+                embed_songs = 0  # Each time a song is added to the embed queue.
+                queue_display_list = (
+                    []
+                )  # Local list so when a song leaves the queue doesn't generate an index error.
+                self.embeded_queue = (
+                    []
+                )  # We reset the embeded queue if multiple calls of queue command are done.
+                queue_duration = 0  # Total duration of all the songs in queue.
 
-                if self.is_queue_shuffled == True:
+                if self.is_queue_shuffled is True:
                     # We want to show the user the queue shuffled if he calls this command
                     # after shuffling the queue.
                     queue_display_list = self.shuffled_music_queue
@@ -595,22 +739,23 @@ class MusicCog(commands.Cog, name='Music Cog'):
                 else:
                     queue_display_list = self.music_queue
 
-
                 while embed_songs < len(queue_display_list):
                     next_song_info = ""
                     song_info = queue_display_list[embed_songs][0]
                     if song_info["title"] == "" or song_info["duration"] == "":
-                        # This means Youtube Data API couldn't or hasn't retrieved the information 
+                        # This means Youtube Data API couldn't or hasn't retrieved the information
                         # for the song. So we need to fetch it to be able to display it in the queue
-                        next_song_info = await self._retrieve_song(url=self.music_queue[embed_songs][0]["url"])
-                        if not next_song_info: 
+                        next_song_info = await self._retrieve_song(
+                            url=self.music_queue[embed_songs][0]["url"]
+                        )
+                        if not next_song_info:
                             # If retriving the info from our db didn't work
-                            next_song_info = self._search_youtube_url(
+                            next_song_info = await self._search_youtube_url(
                                 item=self.music_queue[embed_songs][0]["url"],
-                                author=self.music_queue[embed_songs][0]["author"]
+                                author=self.music_queue[embed_songs][0]["author"],
                             )
 
-                        if next_song_info: 
+                        if next_song_info:
                             # If retriving the info from our db worked
                             self.music_queue[embed_songs][0] = next_song_info
                             queue_display_list[embed_songs][0] = next_song_info
@@ -630,13 +775,13 @@ class MusicCog(commands.Cog, name='Music Cog'):
                         duration = queue_display_list[embed_songs][0]["duration"]
                         author = queue_display_list[embed_songs][0]["author"]
 
-                    embed_message = f"`{queue_display_msg}{str(embed_songs+1)} -` [{title}]({url})|`{self._convert_seconds(duration)} ({author})`\n"
+                    embed_message = f"`{queue_display_msg}{str(embed_songs + 1)} -` [{title}]({url})|`{self._convert_seconds(duration)} ({author})`\n"
 
                     if len(embed_message) < 1024:
                         # This means we reached the maximun that an embed field can handle.
                         if embed_songs < len(queue_display_list):
                             # If we haven't reached the end of the music_queue
-                            queue_display_msg += f"`{str(embed_songs+1)} -` [{title}]({url})|`{self._convert_seconds(duration)} ({author})`\n"
+                            queue_display_msg += f"`{str(embed_songs + 1)} -` [{title}]({url})|`{self._convert_seconds(duration)} ({author})`\n"
                             queue_duration += duration
                             embed_songs += 1
 
@@ -653,28 +798,58 @@ class MusicCog(commands.Cog, name='Music Cog'):
                 if len(self.embeded_queue) == 1:
                     embeded_queue_item = self.embeded_queue[current]
                     if len(queue_display_list) == 1:
-                        embeded_queue_item.add_field(name="\u200b", value=f"**{len(queue_display_list)} song in queue | {self._convert_seconds(queue_duration)} queue duration**", inline=False)
+                        embeded_queue_item.add_field(
+                            name="\u200b",
+                            value=f"**{len(queue_display_list)} song in queue | {self._convert_seconds(queue_duration)} queue duration**",
+                            inline=False,
+                        )
                     else:
-                        embeded_queue_item.add_field(name="\u200b", value=f"**{len(queue_display_list)} songs in queue | {self._convert_seconds(queue_duration)} queue duration**", inline=False)
+                        embeded_queue_item.add_field(
+                            name="\u200b",
+                            value=f"**{len(queue_display_list)} songs in queue | {self._convert_seconds(queue_duration)} queue duration**",
+                            inline=False,
+                        )
 
-                    embeded_queue_item.set_footer(text=f"Page 1/1", icon_url="https://cdn-icons-png.flaticon.com/512/1384/1384061.png")
-                    msg = await context.send(embed=embeded_queue_item, delete_after=60.0)
-                    
+                    embeded_queue_item.set_footer(
+                        text="Page 1/1",
+                        icon_url="https://cdn-icons-png.flaticon.com/512/1384/1384061.png",
+                    )
+                    msg = await context.send(
+                        embed=embeded_queue_item, delete_after=60.0
+                    )
+
                 elif len(self.embeded_queue) > 1:
-                    buttons = [u"\u23EA", u"\u2B05", u"\u27A1", u"\u23E9"] # Skip to start, left, right, skip to end buttons.
+                    buttons = [
+                        "\u23ea",
+                        "\u2b05",
+                        "\u27a1",
+                        "\u23e9",
+                    ]  # Skip to start, left, right, skip to end buttons.
                     # We only need the pagination functionality if there are multiple embed queue pages.
 
                     embeded_queue_item = self.embeded_queue[current]
-                    embeded_queue_item.add_field(name="\u200b", value=f"**{len(queue_display_list)} songs in queue | {self._convert_seconds(queue_duration)} queue duration**", inline=False)
-                    embeded_queue_item.set_footer(text=f"Page {current+1}/{len(self.embeded_queue)}", icon_url="https://cdn-icons-png.flaticon.com/512/1384/1384061.png")
+                    embeded_queue_item.add_field(
+                        name="\u200b",
+                        value=f"**{len(queue_display_list)} songs in queue | {self._convert_seconds(queue_duration)} queue duration**",
+                        inline=False,
+                    )
+                    embeded_queue_item.set_footer(
+                        text=f"Page {current + 1}/{len(self.embeded_queue)}",
+                        icon_url="https://cdn-icons-png.flaticon.com/512/1384/1384061.png",
+                    )
 
                     msg = await context.send(embed=self.embeded_queue[current])
                     for button in buttons:
                         await msg.add_reaction(button)
-    
+
                     while True:
                         try:
-                            reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: user == context.author and reaction.emoji in buttons, timeout=60.0)
+                            reaction, user = await self.bot.wait_for(
+                                "reaction_add",
+                                check=lambda reaction, user: user == context.author
+                                and reaction.emoji in buttons,
+                                timeout=60.0,
+                            )
 
                         except asyncio.TimeoutError:
                             await msg.delete()
@@ -682,19 +857,19 @@ class MusicCog(commands.Cog, name='Music Cog'):
 
                         else:
                             previous_page = current
-                            if reaction.emoji == u"\u23EA": # Skip to Start
+                            if reaction.emoji == "\u23ea":  # Skip to Start
                                 current = 0
-                                
-                            elif reaction.emoji == u"\u2B05": # Previous queue page
+
+                            elif reaction.emoji == "\u2b05":  # Previous queue page
                                 if current > 0:
                                     current -= 1
-                                    
-                            elif reaction.emoji == u"\u27A1": # Next queue page
-                                if current < len(self.embeded_queue)-1:
+
+                            elif reaction.emoji == "\u27a1":  # Next queue page
+                                if current < len(self.embeded_queue) - 1:
                                     current += 1
 
-                            elif reaction.emoji == u"\u23E9": # Last queue page
-                                current = len(self.embeded_queue)-1
+                            elif reaction.emoji == "\u23e9":  # Last queue page
+                                current = len(self.embeded_queue) - 1
 
                             for button in buttons:
                                 await msg.remove_reaction(button, context.author)
@@ -702,17 +877,30 @@ class MusicCog(commands.Cog, name='Music Cog'):
                             if current != previous_page:
                                 embeded_queue_item = self.embeded_queue[current]
 
-                                if len(embeded_queue_item.fields) > 1: # If the info field was already added just modify it instead of re adding it.
-                                    embeded_queue_item.set_field_at(index=1 ,name="\u200b", value=f"**{len(queue_display_list)} songs in queue | {self._convert_seconds(queue_duration)} queue duration**", inline=False)
+                                if (
+                                    len(embeded_queue_item.fields) > 1
+                                ):  # If the info field was already added just modify it instead of re adding it.
+                                    embeded_queue_item.set_field_at(
+                                        index=1,
+                                        name="\u200b",
+                                        value=f"**{len(queue_display_list)} songs in queue | {self._convert_seconds(queue_duration)} queue duration**",
+                                        inline=False,
+                                    )
                                 else:
-                                    embeded_queue_item.add_field(name="\u200b", value=f"**{len(queue_display_list)} songs in queue | {self._convert_seconds(queue_duration)} queue duration**", inline=False)
-                                
-                                embeded_queue_item.set_footer(text=f"Page {current+1}/{len(self.embeded_queue)}", icon_url="https://cdn-icons-png.flaticon.com/512/1384/1384061.png")
+                                    embeded_queue_item.add_field(
+                                        name="\u200b",
+                                        value=f"**{len(queue_display_list)} songs in queue | {self._convert_seconds(queue_duration)} queue duration**",
+                                        inline=False,
+                                    )
+
+                                embeded_queue_item.set_footer(
+                                    text=f"Page {current + 1}/{len(self.embeded_queue)}",
+                                    icon_url="https://cdn-icons-png.flaticon.com/512/1384/1384061.png",
+                                )
                                 await msg.edit(embed=embeded_queue_item)
 
-            else: 
+            else:
                 await context.send("Actualmente no hay música en la cola 💔")
-
 
     @commands.command(aliases=SKIP_COMMAND_ALIASES)
     @commands.check(_check_if_valid)
@@ -723,16 +911,17 @@ class MusicCog(commands.Cog, name='Music Cog'):
             * context: This class contains a lot of meta data an represents the context in which a command is being invoked under
         """
         if await self._check_self_bot(context):
-            if self.current_voice_channel: 
+            if self.current_voice_channel:
                 if self.current_voice_channel.is_playing():
                     # This will trigger the lambda e function from _reproduce_next_song_in_queue method to jump to the next song in queue
                     self.current_voice_channel.stop()
                 else:
-                    await context.send(f"{BOT_NAME} no esta tocando ninguna canción.")  
+                    await context.send(f"{BOT_NAME} no esta tocando ninguna canción.")
             else:
-                await context.send(f"Actualmente {BOT_NAME} no está en un canal de voz.")
+                await context.send(
+                    f"Actualmente {BOT_NAME} no está en un canal de voz."
+                )
 
-    
     @commands.command(aliases=SHUFFLE_COMMAND_ALIASES)
     @commands.check(_check_if_valid)
     async def shuffle(self, context):
@@ -749,8 +938,7 @@ class MusicCog(commands.Cog, name='Music Cog'):
                 self.is_queue_shuffled = True
                 await context.send("Le hiciste brrrr a esa cola c:")
             else:
-               await context.send("La cola no tiene canciones actualmente :c")
-
+                await context.send("La cola no tiene canciones actualmente :c")
 
     @commands.command(aliases=NOW_PLAYING_COMMAND_ALIASES)
     @commands.check(_check_if_valid)
@@ -769,17 +957,15 @@ class MusicCog(commands.Cog, name='Music Cog'):
 
                 # [{title}]({url})
                 await context.send(
-                    embed= discord.Embed(
-                        color=discord.Color.blurple())
-                        .add_field(name="Canción Actual", value=f"[{title}]({url})")
-                        .add_field(name="Duración", value=self._convert_seconds(duration))
-                        .add_field(name="Added by", value=author)
-                        .set_thumbnail(url=self.now_playing[0]["thumbnail"])
-                        , delete_after=60.0
+                    embed=discord.Embed(color=discord.Color.blurple())
+                    .add_field(name="Canción Actual", value=f"[{title}]({url})")
+                    .add_field(name="Duración", value=self._convert_seconds(duration))
+                    .add_field(name="Added by", value=author)
+                    .set_thumbnail(url=self.now_playing[0]["thumbnail"]),
+                    delete_after=60.0,
                 )
             else:
-               await context.send("Actualmente no se está tocando ninguna canción.") 
-    
+                await context.send("Actualmente no se está tocando ninguna canción.")
 
     @commands.command(aliases=JOIN_COMMAND_ALIASES)
     @commands.check(_check_if_valid)
@@ -790,7 +976,6 @@ class MusicCog(commands.Cog, name='Music Cog'):
             * context: This class contains a lot of meta data an represents the context in which a command is being invoked under
         """
         await self._try_to_connect(context.author.voice.channel)
-
 
     @commands.command(aliases=PAUSE_COMMAND_ALIASES)
     @commands.check(_check_if_valid)
@@ -806,7 +991,6 @@ class MusicCog(commands.Cog, name='Music Cog'):
                 self.is_paused = True
                 self.is_playing = False
                 await context.send(f"Al {BOT_NAME} se le paró... la canción (╹ڡ╹ )")
-    
 
     @commands.command(aliases=RESUME_COMMAND_ALIASES)
     @commands.check(_check_if_valid)
@@ -821,8 +1005,9 @@ class MusicCog(commands.Cog, name='Music Cog'):
                 self.current_voice_channel.resume()
                 self.is_paused = False
                 self.is_playing = True
-                await context.send(f"El {BOT_NAME} te seguirá tocando... la canción ♪(´▽｀)") 
-
+                await context.send(
+                    f"El {BOT_NAME} te seguirá tocando... la canción ♪(´▽｀)"
+                )
 
     @commands.command(aliases=MOVE_COMMAND_ALIASES)
     @commands.check(_check_if_valid)
@@ -835,30 +1020,37 @@ class MusicCog(commands.Cog, name='Music Cog'):
         """
         if await self._check_self_bot(context):
             if len(self.music_queue) > 0:
-                positions =  " ".join(args).split(" ")
+                positions = " ".join(args).split(" ")
                 if len(positions) < 3 and positions[0] != "":
                     # This command only works for 1 or 2 parameters.
-                    if len(positions) == 2: # Logic when 2 paramaters move X Y = move X -> Y
-                        position_one = int(positions[0])-1
-                        position_two = int(positions[1])-1
+                    if (
+                        len(positions) == 2
+                    ):  # Logic when 2 paramaters move X Y = move X -> Y
+                        position_one = int(positions[0]) - 1
+                        position_two = int(positions[1]) - 1
 
                         if position_one >= 0 or position_two >= 0:
                             insert_this_item = self.music_queue.pop(position_one)
                             self.music_queue.insert(position_two, insert_this_item)
-                            await context.send(f"{insert_this_item[0]['title']} reprogramada a la posición {position_two+1}! ✪ ω ✪")
+                            await context.send(
+                                f"{insert_this_item[0]['title']} reprogramada a la posición {position_two + 1}! ✪ ω ✪"
+                            )
                         else:
-                            await context.send("Los parámetros deben ser mayores a 0!")  
-                    else: # Logic when only 1 paramater move X = move X -> 1
-                        position_one = int(positions[0])-1
+                            await context.send("Los parámetros deben ser mayores a 0!")
+                    else:  # Logic when only 1 paramater move X = move X -> 1
+                        position_one = int(positions[0]) - 1
                         if position_one >= 0:
                             insert_this_item = self.music_queue.pop(position_one)
                             self.music_queue.insert(0, insert_this_item)
-                            await context.send(f"{insert_this_item[0]['title']} reprogramada a la posición 1! ✪ ω ✪")
+                            await context.send(
+                                f"{insert_this_item[0]['title']} reprogramada a la posición 1! ✪ ω ✪"
+                            )
                 else:
-                    await context.send("Woa woa alto ahí, este comando solo permite a lo más 1 o 2 parámetros.")  
+                    await context.send(
+                        "Woa woa alto ahí, este comando solo permite a lo más 1 o 2 parámetros."
+                    )
             else:
                 await context.send("Actualmente no hay música en la cola 💔")
-
 
     @commands.command(aliases=HELP_COMMAND_ALIASES)
     async def help_alias(self, context):
@@ -867,18 +1059,18 @@ class MusicCog(commands.Cog, name='Music Cog'):
         Params:
             * context: This class contains a lot of meta data an represents the context in which a command is being invoked under
         """
-        accepted_channel = int(os.getenv("MUSIC_CHANNEL"))
+        accepted_channel = MUSIC_CHANNEL
         if context.message.channel.id != accepted_channel:
-            await context.send(os.getenv("ERROR_403_CANAL_MUSICA"))
+            await context.send("Este canal no está aceptando comandos.")
         else:
             await context.send(
                 embed=discord.Embed(
-                    title= "Click aquí para ver la documentación de Comandos del bot de música 🍆", 
+                    title="Click aquí para ver la documentación de Comandos del bot de música 🍆",
                     color=discord.Color.blurple(),
-                    url=self.help_commands_url)
-                    , delete_after=60.0
+                    url=self.help_commands_url,
+                ),
+                delete_after=60.0,
             )
-
 
     @commands.command(aliases=DISCONNECT_COMMAND_ALIASES)
     @commands.check(_check_if_valid)
@@ -898,7 +1090,9 @@ class MusicCog(commands.Cog, name='Music Cog'):
                     self.music_queue = []
                     self.now_playing = []
             else:
-                await context.send(f"El {BOT_NAME} no está conectado a un canal de voz.")
+                await context.send(
+                    f"El {BOT_NAME} no está conectado a un canal de voz."
+                )
 
     @commands.command(aliases=PLAY_NEXT_COMMAND_ALIASES)
     @commands.check(_check_if_valid)
@@ -915,12 +1109,16 @@ class MusicCog(commands.Cog, name='Music Cog'):
                 voice_channel = context.author.voice.channel
                 author_of_command = context.author.name
 
-                youtube_query = self._sanitize_youtube_query(youtube_query=youtube_query)
+                youtube_query = self._sanitize_youtube_query(
+                    youtube_query=youtube_query
+                )
                 is_playlist = self._is_youtube_playlist(youtube_query=youtube_query)
 
                 if not is_playlist:
-                    song_info = self._search_youtube_url(item=youtube_query, author=author_of_command)
-                    if not song_info: 
+                    song_info = await self._search_youtube_url(
+                        item=youtube_query, author=author_of_command
+                    )
+                    if not song_info:
                         # This was done for the exception that _search_youtube_url can throw if you try to
                         # reproduce a playlist or livestream. Search later if this can be avoided.
                         await context.send("Mae no se pudo descargar la canción.")
@@ -929,12 +1127,16 @@ class MusicCog(commands.Cog, name='Music Cog'):
                             url=song_info["url"],
                             title=song_info["title"],
                             duration=song_info["duration"],
-                            thumbnail=song_info["thumbnail"]
+                            thumbnail=song_info["thumbnail"],
                         )
                         self.music_queue.insert(0, [song_info, voice_channel])
-                        await context.send("Canción añadida al inicio de la colaヾ(•ω•`)o")
+                        await context.send(
+                            "Canción añadida al inicio de la colaヾ(•ω•`)o"
+                        )
                 else:
-                    await context.send(f"Este comando no procesa listas, para eso use el comando play.")
+                    await context.send(
+                        "Este comando no procesa listas, para eso use el comando play."
+                    )
             else:
                 # If there is no queue, this means we can execute the play command just normal
                 await self.play(context, *args)

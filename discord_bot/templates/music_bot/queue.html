@@ -9,10 +9,10 @@
         <h1 class="mt-4">Queue</h1>
         <hr>
         <p>
-            Si una canción actualmente está sonando en el Marbot y una o más canciones fueron agregadas para ser reproducidas, 
+            Si una canción actualmente está sonando en el Marbot y una o más canciones fueron agregadas para ser reproducidas,
             estas entran en la cola de canciones.
-            <br> Este comando permite mostrar todas las canciones organizadas en varias páginas dependiendo de la 
-            cantidad de canciones en cola por un minuto. 
+            <br> Este comando permite mostrar todas las canciones organizadas en varias páginas dependiendo de la
+            cantidad de canciones en cola por un minuto.
             <br>
             <br> Esta es la información que brinda:
             <ul>
@@ -33,7 +33,7 @@
             Por otro lado, si no hay canciones en la cola:
         </p>
         <img src="{% static 'assets/empty_queue.png' %}" alt="empty queue image">
-        <p> 
+        <p>
             Estos son los distintos comandos que pueden utilizar:
             <ul>
                 {% for command in command_aliases %}

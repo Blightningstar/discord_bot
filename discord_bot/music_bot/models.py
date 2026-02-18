@@ -1,5 +1,6 @@
 from django.db import models
 
+
 class SongLog(models.Model):
     url = models.URLField(primary_key=True)
     title = models.CharField(max_length=1000)

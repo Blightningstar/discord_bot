@@ -1,0 +1,59 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+default_language_version:
+  python: python3
+exclude: |
+  (?x)(
+    migrations/|
+    .idea/|
+    .venv/|
+    venv/|
+    .git/
+  )
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+        args: ['--maxkb=900']
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+  - repo: https://github.com/pycqa/isort
+    rev: 7.0.0
+    hooks:
+      - id: isort
+  - repo: https://github.com/psf/black
+    rev: 25.9.0
+    hooks:
+      - id: black
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.3.0
+    hooks:
+      - id: flake8
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.9.7
+    hooks:
+      - id: uv-lock
+      - id: uv-export
+        name: export main requirements
+        args: [
+          "--no-dev",
+          "--format",
+          "requirements.txt",
+          "--output-file=requirements.txt",
+          "--no-hashes",
+          "--frozen",
+        ]
+      - id: uv-export
+        name: export dev requirements
+        args: [
+          "--format",
+          "requirements.txt",
+          "--output-file=requirements-dev.txt",
+          "--no-hashes",
+          "--frozen",
+        ]
