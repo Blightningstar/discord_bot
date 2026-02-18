@@ -1,35 +1,35 @@
-############################### Play Command
-PLAY_COMMAND_ALIASES = ["rolela","r", "p"]
+# Play Command
+PLAY_COMMAND_ALIASES = ["rolela", "r", "p"]
 
-############################### Queue Command
-QUEUE_COMMAND_ALIASES = ["cola","c","q"]
+# Queue Command
+QUEUE_COMMAND_ALIASES = ["cola", "c", "q"]
 
-############################### Skip Command
-SKIP_COMMAND_ALIASES = ["saltela","s", "siguiente"]
+# Skip Command
+SKIP_COMMAND_ALIASES = ["saltela", "s", "siguiente"]
 
-############################### Shuffle Command
+# Shuffle Command
 SHUFFLE_COMMAND_ALIASES = ["barajela", "b"]
 
-############################### Now Playing Command
-NOW_PLAYING_COMMAND_ALIASES = ["np","cual", "cual suena", "zelda", "z", "ls"]
+# Now Playing Command
+NOW_PLAYING_COMMAND_ALIASES = ["np", "cual", "cual suena", "zelda", "z", "ls"]
 
-############################### Join Command
-JOIN_COMMAND_ALIASES = ["unete","u", "j"]
+# Join Command
+JOIN_COMMAND_ALIASES = ["unete", "u", "j"]
 
-############################### Pause Command
-PAUSE_COMMAND_ALIASES = ["pausa","detain", "d", "pa", "pare"]
+# Pause Command
+PAUSE_COMMAND_ALIASES = ["pausa", "detain", "d", "pa", "pare"]
 
-############################### Resume Command
-RESUME_COMMAND_ALIASES = ["siga","continue", "re"]
+# Resume Command
+RESUME_COMMAND_ALIASES = ["siga", "continue", "re"]
 
-############################### Move Command
-MOVE_COMMAND_ALIASES = ["mueva","m", "coleme"]
+# Move Command
+MOVE_COMMAND_ALIASES = ["mueva", "m", "coleme"]
 
-############################### Help Command
+# Help Command
 HELP_COMMAND_ALIASES = ["h", "commands", "ayuda", "comandos", "info", "aiuda", "alias"]
 
-############################### Disconnect Command
-DISCONNECT_COMMAND_ALIASES = ["jale","desconectar", "apagar"]
+# Disconnect Command
+DISCONNECT_COMMAND_ALIASES = ["jale", "desconectar", "apagar"]
 
-############################### Play Next Command
+# Play Next Command
 PLAY_NEXT_COMMAND_ALIASES = ["pn", "n"]
