@@ -13,9 +13,12 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+
 import os
+
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import include, path
+
 from .views import home
 
 if os.getenv("DJANGO_ENV") == "PROD":
@@ -26,6 +29,6 @@ elif os.getenv("DJANGO_ENV") == "DEV":
 url_bot_name = str(BOT_NAME).lower()
 urlpatterns = [
     path("", home, name="home"),
-    path('admin/', admin.site.urls),
-    path(f'{url_bot_name}/', include('music_bot.urls')),
+    path("admin/", admin.site.urls),
+    path(f"{url_bot_name}/", include("music_bot.urls")),
 ]
