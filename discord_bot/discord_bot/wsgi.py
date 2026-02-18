@@ -11,6 +11,9 @@ import os
 
 from django.core.wsgi import get_wsgi_application
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'discord_bot.settings')
+if os.getenv("DJANGO_ENV") == "PROD":
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'discord_bot.settings.production')
+else:
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'discord_bot.settings.dev')
 
 application = get_wsgi_application()
