@@ -25,3 +25,11 @@ dependencies = [
     "pillow>=12.1.1",
     "environs>=14.5.0",
 ]
+
+[project.optional-dependencies]
+dev = [
+    "pre-commit>=4.0.1",
+]
+
+[project.scripts]
+pre-commit = "pre_commit.main:main"
