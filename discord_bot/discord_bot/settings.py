@@ -35,10 +35,8 @@ ALLOWED_HOSTS = ast.literal_eval(env("ALLOWED_HOSTS"))
 
 BOT_NAME = env.str("BOT_NAME")
 MUSIC_CHANNEL = env.int("MUSIC_CHANNEL")
-ERROR_403_CANAL_MUSICA = env.str("ERROR_403_CANAL_MUSICA")
 HALLOWEEN_CHANNEL = env.str("HALLOWEEN_CHANNEL")
 YT_API_KEY = env.str("YT_API_KEY")
-COOKIE_FILE = env.str("COOKIE_FILE")
 DISCORD_TOKEN = env.str("DISCORD_TOKEN")
 
 # Application definition
