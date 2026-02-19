@@ -16,34 +16,27 @@ audioop-lts==0.2.2
     # via discord-py
 beautifulsoup4==4.14.3
     # via bs4
-brotli==1.2.0 ; platform_python_implementation == 'CPython'
-    # via yt-dlp
-brotlicffi==1.2.0.0 ; platform_python_implementation != 'CPython'
-    # via yt-dlp
 bs4==0.0.1
     # via discord-bot
 certifi==2026.1.4
-    # via
-    #   requests
-    #   yt-dlp
+    # via requests
 cffi==2.0.0
     # via
-    #   brotlicffi
     #   cryptography
     #   pynacl
 charset-normalizer==3.4.4
     # via requests
 cryptography==46.0.5
     # via google-auth
-datetime==4.5
-    # via discord-bot
 decorator==5.2.1
     # via validators
 discord==2.2.2
     # via discord-bot
 discord-py==2.6.4
     # via discord
-django==4.1
+django==4.2.28
+    # via discord-bot
+environs==14.5.0
     # via discord-bot
 ffmpeg-python==0.2.0
     # via discord-bot
@@ -76,12 +69,12 @@ idna==3.11
     # via
     #   requests
     #   yarl
+marshmallow==4.2.2
+    # via environs
 multidict==6.7.1
     # via
     #   aiohttp
     #   yarl
-mutagen==1.47.0
-    # via yt-dlp
 numpy==2.4.2
     # via discord-bot
 pillow==12.1.1
@@ -97,8 +90,10 @@ protobuf==6.33.5
     #   google-api-core
     #   googleapis-common-protos
     #   proto-plus
-psycopg2-binary==2.9.3
+psycopg==3.3.3
     # via discord-bot
+psycopg-binary==3.3.3 ; implementation_name != 'pypy'
+    # via psycopg
 pyasn1==0.6.2
     # via
     #   pyasn1-modules
@@ -107,14 +102,14 @@ pyasn1-modules==0.4.2
     # via google-auth
 pycparser==3.0 ; implementation_name != 'PyPy'
     # via cffi
-pycryptodomex==3.23.0
-    # via yt-dlp
 pynacl==1.5.0
     # via discord-bot
 pyparsing==3.3.2
     # via httplib2
+python-dotenv==1.2.1
+    # via environs
 pytz==2025.2
-    # via datetime
+    # via discord-bot
 requests==2.32.5
     # via google-api-core
 rsa==4.9.1
@@ -130,20 +125,18 @@ sqlparse==0.5.5
 typing-extensions==4.15.0
     # via beautifulsoup4
 tzdata==2025.3 ; sys_platform == 'win32'
-    # via django
+    # via
+    #   django
+    #   psycopg
 uritemplate==4.2.0
     # via google-api-python-client
 urllib3==2.6.3
     # via requests
 validators==0.20.0
     # via discord-bot
-websockets==16.0
-    # via yt-dlp
 whitenoise==6.2.0
     # via discord-bot
 yarl==1.22.0
     # via aiohttp
-yt-dlp==2023.7.6
+yt-dlp==2026.2.4
     # via discord-bot
-zope-interface==8.2
-    # via datetime
