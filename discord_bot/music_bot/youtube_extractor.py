@@ -1,8 +1,11 @@
 import asyncio
+import logging
 from typing import Any, Dict, Optional
 
 import validators
 from yt_dlp import YoutubeDL
+
+logger = logging.getLogger(__name__)
 
 from .dto import SongInfoDTO
 
@@ -99,7 +102,7 @@ class YouTubeExtractorService:
                     None, lambda: self._extract_sync(url, retry_opts)
                 )
             except Exception as e:
-                print("yt-dlp extract_info failed:", e)
+                logger.error("yt-dlp extract_info failed: %s", e)
                 return None
 
         formats = info.get("formats") or []
@@ -112,16 +115,22 @@ class YouTubeExtractorService:
                 )
                 formats = info.get("formats") or []
             except Exception as e:
-                print("yt-dlp retry with js_runtimes failed:", e)
+                logger.warning("yt-dlp retry with js_runtimes failed: %s", e)
 
         if self.test_mode:
             try:
-                print(f"[yt-dlp] formats for {info.get('id')}: {len(formats)} entries")
+                logger.debug(
+                    "[yt-dlp] formats for %s: %d entries", info.get("id"), len(formats)
+                )
                 for f in formats:
-                    print(
-                        f"  {f.get('format_id')}\t{f.get('ext')}\t"
-                        f"acodec={f.get('acodec')}\tabr={f.get('abr')}\ttbr={f.get('tbr')}\t"
-                        f"{(f.get('url') or '')[:120]}"
+                    logger.debug(
+                        "  %s\t%s\tacodec=%s\tabr=%s\ttbr=%s\t%s",
+                        f.get("format_id"),
+                        f.get("ext"),
+                        f.get("acodec"),
+                        f.get("abr"),
+                        f.get("tbr"),
+                        (f.get("url") or "")[:120],
                     )
             except Exception:
                 pass
