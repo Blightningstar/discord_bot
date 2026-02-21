@@ -1,8 +1,11 @@
 import asyncio
 import json
+import logging
 import re
 from datetime import timedelta
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 import discord
 import requests
@@ -188,7 +191,9 @@ class MusicService:
                 try:
                     video_response = await loop.run_in_executor(None, fetch_video)
                 except Exception as e:
-                    print(f"Error fetching video info from YouTube Data API: {e}")
+                    logger.error(
+                        "Error fetching video info from YouTube Data API: %s", e
+                    )
                     continue
 
                 items = video_response.get("items", None)
@@ -250,7 +255,7 @@ class MusicService:
                             ][1].connect()
                         connected = True
                 except Exception as e:
-                    print(f"Algo salio mal al conectar al bot: {str(e)}.")
+                    logger.error("Algo salio mal al conectar al bot: %s", e)
                     break
         else:
             try:
@@ -268,8 +273,9 @@ class MusicService:
                             await voice_channel_to_connect.connect()
                         )
             except Exception as e:
-                print(
-                    f"Algo salio mal al usar el comando 'join' para conectar al bot: {str(e)}."
+                logger.error(
+                    "Algo salio mal al usar el comando 'join' para conectar al bot: %s",
+                    e,
                 )
 
     async def reproduce_next_song_in_queue(self):
@@ -317,13 +323,13 @@ class MusicService:
                         )
                         self.cog.current_voice_channel.source.volume = 3.0
                     except Exception as e:
-                        print("Error with FFmpeg: " + str(e))
+                        logger.error("Error with FFmpeg: %s", e)
                         await self.reproduce_next_song_in_queue()
                 else:
                     await self.reproduce_next_song_in_queue()
 
             except Exception as e:
-                print(str(e))
+                logger.error("Unexpected error in reproduce_next_song_in_queue: %s", e)
                 self.cog.is_playing = False
         else:
             self.cog.is_playing = False

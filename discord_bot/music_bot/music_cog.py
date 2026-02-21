@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 import discord
 import numpy as np
@@ -23,6 +24,8 @@ from .music_commands import (
 )
 from .music_service import MusicService
 from .youtube_extractor import YouTubeExtractorService
+
+logger = logging.getLogger(__name__)
 
 
 class MusicCog(commands.Cog, name="Music Cog"):
@@ -344,7 +347,8 @@ class MusicCog(commands.Cog, name="Music Cog"):
 
                         except asyncio.TimeoutError:
                             await msg.delete()
-                            return print("QUEUE EMBED NATURAL TIMEOUT")
+                            logger.debug("Queue embed pagination timed out naturally")
+                            return
 
                         else:
                             previous_page = current
