@@ -1,9 +1,16 @@
+import os
+
 import discord
+import django
 from discord.ext import commands
-from halloween_bot.halloween_cog import HalloweenCog
-from music_bot.music_cog import MusicCog
 
 from discord_bot.settings import BOT_NAME, DISCORD_TOKEN, MUSIC_CHANNEL
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "discord_bot.settings")
+django.setup()
+
+from halloween_bot.halloween_cog import HalloweenCog
+from music_bot.music_cog import MusicCog
 
 intents = discord.Intents.default()
 intents.message_content = True
