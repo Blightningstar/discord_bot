@@ -1,8 +1,11 @@
+import logging
 import os
 
 import discord
 import django
 from discord.ext import commands
+
+logger = logging.getLogger(__name__)
 
 from discord_bot.settings import BOT_NAME, DISCORD_TOKEN, MUSIC_CHANNEL
 
@@ -25,13 +28,13 @@ async def main():
         async with bot:
             await bot.start(DISCORD_TOKEN)
     except Exception as e:
-        print("Bot Error: " + str(e))
+        logger.error("Bot Error: %s", e)
 
 
 @bot.event
 async def on_ready():
     message = BOT_NAME + " ha despertado!"
-    print(message)
+    logger.info(message)
 
     music_channel = MUSIC_CHANNEL
 
