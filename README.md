@@ -67,7 +67,9 @@ discord_bot/               ← Django project root (contains manage.py)
 ├── music_bot/             ← Django app: Music cog + web help pages
 │   ├── music_cog.py       ← All music Discord commands (MusicCog)
 │   ├── music_commands.py  ← Command name constants and aliases
-│   ├── music_reference.py ← Early prototype/reference implementation
+│   ├── music_service.py   ← Business logic: song search, queue ops, DB bridge
+│   ├── youtube_extractor.py ← yt-dlp wrapper; audio format selection
+│   ├── dto.py             ← SongInfoDTO dataclass
 │   ├── models.py          ← SongLog model (song cache)
 │   ├── views.py           ← Per-command help page views
 │   └── urls.py            ← URL routes for music help pages
@@ -90,22 +92,23 @@ discord_bot/               ← Django project root (contains manage.py)
 | `play <url\|name>` | `r`, `rolela`, `p` | Queue a YouTube URL or search by name |
 | `play_next <url\|name>` | `pn`, `n` | Insert a song at the front of the queue |
 | `queue` | `c`, `cola`, `q` | Display all queued songs as rich embeds |
-| `now_playing` | `np`, `cual`, `z`, `ls` | Show the currently playing song |
+| `now_playing` | `np`, `cual`, `cual suena`, `zelda`, `z`, `ls` | Show the currently playing song |
 | `skip` | `s`, `saltela`, `siguiente` | Skip to the next song |
-| `pause` | `d`, `pausa`, `pa`, `pare` | Pause playback |
+| `pause` | `pausa`, `detain`, `d`, `pa`, `pare` | Pause playback |
 | `resume` | `re`, `siga`, `continue` | Resume playback |
 | `shuffle` | `b`, `barajela` | Shuffle the current queue |
 | `move <pos1> <pos2>` | `m`, `mueva`, `coleme` | Move a song within the queue |
 | `join` | `u`, `unete`, `j` | Join the user's voice channel |
 | `disconnect` | `jale`, `desconectar`, `apagar` | Leave the voice channel |
-| `help` | `h`, `commands`, `ayuda`, `alias` | Link to the web command-reference |
+| `help` | `h`, `commands`, `ayuda`, `comandos`, `info`, `aiuda`, `alias` | Link to the web command-reference |
 
 **Notable implementation details:**
 
 - **Song caching** — Before downloading audio, the bot queries the `SongLog` database table. If a song has been played before, its metadata (title, duration, thumbnail) is retrieved from the DB instead of re-fetching from the YouTube Data API, reducing API quota usage.
 - **Playlist support** — Passing a YouTube playlist URL enqueues all videos in the playlist using the YouTube Data API v3 (paginated, up to 50 videos per page).
-- **Audio format selection** — `yt-dlp` extracts available formats and selects the best Opus audio stream based on bitrate; falls back to a Node.js JS runtime if the initial extraction fails.
-- **Async/sync bridge** — ORM calls (`SongLog.objects.filter`, `.save()`) are wrapped with `@sync_to_async` to keep the asyncio event loop unblocked.
+- **Audio format selection** — Extraction is handled by `YouTubeExtractorService` (`youtube_extractor.py`). It prefers Opus audio streams and scores candidates by bitrate (`abr`/`tbr`), falling back to any available audio format. If the initial extraction yields no audio formats, a second attempt is made with the `js_runtimes` Node.js option enabled.
+- **`SongInfoDTO`** — A typed dataclass (`dto.py`) carrying `author`, `url`, `title`, `duration`, `source`, `thumbnail`, and `format_id`. Replaces raw dict passing between `YouTubeExtractorService`, `MusicService`, and `MusicCog`.
+- **Async/sync bridge** — ORM calls (`SongLog.objects.filter`, `.save()`) in `MusicService` are wrapped with `@sync_to_async` to keep the asyncio event loop unblocked.
 - **Channel guard** — Commands are only accepted in a designated music text channel (`MUSIC_CHANNEL`), and the command author must be in a voice channel.
 
 ### Halloween Bot
